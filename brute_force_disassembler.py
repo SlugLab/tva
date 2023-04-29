@@ -20,12 +20,12 @@ class BruteForceDisassembler(Disassembler):
     self.md.detail = True
 
   def disasm(self,bytes,base):
-    print 'Starting disassembly...'
+    print( 'Starting disassembly...')
     dummymap = {}
     ten_percent = len(bytes)/10
     for instoff in range(0,len(bytes)):
       if instoff%ten_percent == 0:
-        print 'Disassembly %d%% complete...'%((instoff/ten_percent)*10)
+        print( 'Disassembly %d%% complete...'%((instoff/ten_percent)*10))
       while instoff < len(bytes):
         off = base+instoff
         try:

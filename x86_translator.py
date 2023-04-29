@@ -23,7 +23,7 @@ class X86Translator(Translator):
     elif ins.mnemonic == 'ret':
       return self.translate_ret(ins,mapping)
     elif ins.mnemonic in ['retn','retf','repz']: #I think retn is not used in Capstone
-      #print 'WARNING: unimplemented %s %s'%(ins.mnemonic,ins.op_str)
+      #print( 'WARNING: unimplemented %s %s'%(ins.mnemonic,ins.op_str))
       return '\xf4\xf4\xf4\xf4' #Create obvious cluster of hlt instructions
     else: #Any other instruction
       inserted = self.before_inst_callback(ins)
@@ -96,10 +96,10 @@ class X86Translator(Translator):
       else:
         patched+=asm(jecxz_template)
       newtarget = self.remap_target(ins.address,mapping,target,len(patched))
-      #print 'want %s, but have %s instead'%(remap_target(ins.address,mapping,target,len(patched)), newtarget)
+      #print( 'want %s, but have %s instead'%(remap_target(ins.address,mapping,target,len(patched)), newtarget))
       #Apparently the offset for jcxz and jecxz instructions may have been wrong?  How did it work before?
       patched += asm('jz $+%s'%newtarget)
-      #print 'code length: %d'%len(patched)
+      #print( 'code length: %d'%len(patched))
       
       #TODO: some instructions encode to 6 bytes, some to 5, some to 2.  How do we know which?
       #For example, for CALL, it seems to only be 5 or 2 depending on offset.
@@ -167,9 +167,9 @@ class X86Translator(Translator):
       else:
         self.context.stat['dirjmp']+=1
       newtarget = self.remap_target(ins.address,mapping,target,len(code))
-      #print "(pre)new length: %s"%len(callback_code)
-      #print "target: %s"%hex(target)
-      #print "newtarget: %s"%newtarget
+      #print( "(pre)new length: %s"%len(callback_code))
+      #print( "target: %s"%hex(target))
+      #print( "newtarget: %s"%newtarget)
       if self.context.no_pic and target != self.context.get_pc_thunk:
         code += asm( '%s $+%s'%(ins.mnemonic,newtarget) )
       else:
@@ -177,7 +177,7 @@ class X86Translator(Translator):
         if len(patched) == 2: #Short encoding, which we do not want
           patched+='\x90\x90\x90' #Add padding of 3 NOPs
         code += patched
-      #print "new length: %s"%len(callback_code+patched)
+      #print( "new length: %s"%len(callback_code+patched))
       return code
     return None
   
@@ -242,10 +242,10 @@ class X86Translator(Translator):
         code += asm( template_before%(target,so_call_before) )
         if mapping is not None:
           code += asm(so_call_after%( (mapping[ins.address]+len(code)+self.context.newbase) - (ins.address+len(ins.bytes)) ) )
-          #print 'CODE LEN/1: %d\n%s'%(len(code),code.encode('hex'))
+          #print( 'CODE LEN/1: %d\n%s'%(len(code),code.encode('hex')))
         else:
           code += asm(so_call_after%( (0x8f+self.context.newbase) - (ins.address+len(ins.bytes)) ) )
-          #print 'CODE LEN/0: %d\n%s'%(len(code),code.encode('hex'))
+          #print( 'CODE LEN/0: %d\n%s'%(len(code),code.encode('hex')))
       else:
         code += asm(template_before%(target,exec_call%(ins.address+len(ins.bytes)) ))
     else:
@@ -280,7 +280,7 @@ class X86Translator(Translator):
       address = int(self.memory_ref_string.match(target).group('address'), 16)
       if address in self.context.plt['entries']:
         if self.context.plt['entries'][address] in self.context.callbacks:
-          print 'Found library call with callbacks: %s'%self.context.plt['entries'][address]
+          print( 'Found library call with callbacks: %s'%self.context.plt['entries'][address])
           return self.get_callback_code( insaddr, mapping, self.context.callbacks[self.context.plt['entries'][address]] )
     return b''
   
@@ -333,6 +333,6 @@ class X86Translator(Translator):
     if mapping is not None and target in mapping:#Second pass, known mapping
       newtarget = mapping[target]-(mapping[addr]+offs) #Offset from curr location in mapping
       newtarget = hex(newtarget)
-      #print "original target: %s"%hex(target)
-      #print "%s-(%s+%s) = %s"%(hex(mapping[target]),hex(mapping[addr]),hex(offs),newtarget)
+      #print( "original target: %s"%hex(target))
+      #print( "%s-(%s+%s) = %s"%(hex(mapping[target]),hex(mapping[addr]),hex(offs),newtarget))
     return newtarget

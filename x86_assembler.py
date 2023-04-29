@@ -56,7 +56,7 @@ def asm(text):
     elif pat3.match(line):
       #mov eax, dword ptr [0xcafecafe]
       if ' word' in line:
-        print 'WARNING: silently converting "mov eax, word ptr [<number>]" to "mov eax, dword ptr [<number>]"'
+        print( 'WARNING: silently converting "mov eax, word ptr [<number>]" to "mov eax, dword ptr [<number>]"')
       code+=b'\xa1' + struct.pack('<I',int(line[line.find('[')+1:line.find(']')],16) )
     #Check for mov instruction to eax from some register plus or minus an offset
     #NOTE: This does NOT WORK for esp!  The instruction encoding pattern is DIFFERENT!
@@ -89,7 +89,7 @@ def asm(text):
         newcode = newcode[0:2]+original
       #f.write(str(newcode).encode('hex')+'\n')
       #if newcode != ocode:
-      #  print 'NO MATCH %s:\n%s\n%s'%(line,newcode.encode('hex'),ocode.encode('hex'))
+      #  print( 'NO MATCH %s:\n%s\n%s'%(line,newcode.encode('hex'),ocode.encode('hex')))
       #  raise Exception
       #f.close() 
       code+=newcode
@@ -106,14 +106,14 @@ def asm(text):
         newcode = _asm('%s %s,0x7f'%(mnemonic,register) )
         newcode = newcode[:2] + struct.pack('<b',amount)
       #if newcode != ocode:
-      #  print 'NO MATCH %s:\n%s\n%s'%(line,newcode.encode('hex'),ocode.encode('hex'))
+      #  print( 'NO MATCH %s:\n%s\n%s'%(line,newcode.encode('hex'),ocode.encode('hex')))
       #  raise Exception
       code+=newcode
     elif pat7.match(line):
-      print 'WARNING: silently converting "mov eax, word ptr [<value>]" to "mov eax, dword ptr [<value>]"'
+      print( 'WARNING: silently converting "mov eax, word ptr [<value>]" to "mov eax, dword ptr [<value>]"')
       code+=_asm(line.replace(' word',' dword'))
     elif pat8.match(line):
-      print 'WARNING: silently converting "mov eax, <letter>[xip]" to "mov eax, e<letter>[xip]"'
+      print( 'WARNING: silently converting "mov eax, <letter>[xip]" to "mov eax, e<letter>[xip]"')
       code+=_asm(line.replace(', ',', e'))
     else:
       code+=_asm(line)
@@ -121,32 +121,32 @@ def asm(text):
 
 def oldasm(text):
   if 'mov [esp-16], eax\n  mov eax, ' in text:
-    print text
+    print( text)
     if not pat3.search(text):
-      print str(pwn.asm(text)).encode('hex')
+      print( str(pwn.asm(text)).encode('hex'))
       text2 = '''
   mov [esp-16], eax
   mov eax, dword ptr [eax*4 + 0x80597bc]
 '''
-      print str(pwn.asm(text2)).encode('hex')
+      print( str(pwn.asm(text2)).encode('hex'))
       raise Exception
   if '$+' in text:
     code = b''
     for line in text.split('\n'):
       match = pat.search(line)
       if match and match.group() != '$+0x8f':
-        #print 'ORIGINAL: %s'%line
-        #print 'MATCH %s'%match.group()
+        #print( 'ORIGINAL: %s'%line)
+        #print( 'MATCH %s'%match.group())
         off = int(match.group()[2:],16)
-        #print 'offset %x'%off
+        #print( 'offset %x'%off)
         line = line.strip()
         mnemonic = line[:line.find(' ')]
-        #print 'mnemonic %s'%mnemonic
+        #print( 'mnemonic %s'%mnemonic)
         #before = _asm(line)
-        #print 'BEFORE: %s'%before.encode('hex')
+        #print( 'BEFORE: %s'%before.encode('hex'))
         line = pat.sub('$+0x8f',line) #Replace actual offset with dummy
         newcode = _asm(line) #Assembled code with dummy offset
-        #print 'DUMMY: %s'%newcode.encode('hex')
+        #print( 'DUMMY: %s'%newcode.encode('hex'))
         if mnemonic in ['jmp','call']:
           off-=5 #Subtract 5 because the large encoding knows it's 5 bytes long
           newcode = newcode[0]+struct.pack('<i',off) #Signed int for negative jumps 
@@ -154,35 +154,35 @@ def oldasm(text):
           off-=6 #Subtract 6 because the large encoding knows it's 6 bytes long
           newcode = newcode[0:2]+struct.pack('<i',off) #Signed int for negative jumps
           #if off < 0:
-          #  print 'AFTER: %s'%newcode.encode('hex')
+          #  print( 'AFTER: %s'%newcode.encode('hex'))
           #  raise Exception
-        #print 'AFTER: %s'%newcode.encode('hex')
+        #print( 'AFTER: %s'%newcode.encode('hex'))
         #if before != newcode and len(before) != 2:
         #  raise Exception
         code+=newcode
         #raise Exception
       elif pat2.match(line):
-        #print 'push 02'
+        #print( 'push 02')
         code+=b'\x68' + struct.pack('<I',int(line.strip().split(' ')[1]) ) #push case
       else:
         code+=_asm(line)
     return code
   elif pat2.match(text):
-    #print 'push 01'
+    #print( 'push 01')
     #since this is always the push instruction, there really is no need to call pwn.asm at all.
     return b'\x68' + struct.pack('<I',int(text.strip().split(' ')[1]) )
-    #print str(pwn.asm(text)).encode('hex')
-    #print str(pwn.asm('push 0x8f')).encode('hex')
+    #print( str(pwn.asm(text)).encode('hex'))
+    #print( str(pwn.asm('push 0x8f')).encode('hex'))
   #TODO: use this for optimizations, but also include other instructions outside of match
   match = pat3.search(text)
   if match:
-    print 'MATCHED %s'%match.group()
+    print( 'MATCHED %s'%match.group())
     inst = match.group()
     
-    print str(pwn.asm(inst)).encode('hex')
-    print str(pwn.asm('mov eax, dword ptr [0x8f]')).encode('hex')
-    #print hex(int(inst[inst.find('[')+1:-1],16))
-    print (  b'\xa1' + struct.pack('<I',int(inst[inst.find('[')+1:-1],16) )   ).encode('hex')
+    print( str(pwn.asm(inst)).encode('hex'))
+    print( str(pwn.asm('mov eax, dword ptr [0x8f]')).encode('hex'))
+    #print( hex(int(inst[inst.find('[')+1:-1],16)))
+    print( (  b'\xa1' + struct.pack('<I',int(inst[inst.find('[')+1:-1],16) )   ).encode('hex'))
     return b'\xa1' + struct.pack('<I',int(inst[inst.find('[')+1:-1],16) ) #mov eax, dword ptr [0xcafecafe]
     '''matches = pat.finditer(text)
     start = 0
@@ -193,14 +193,14 @@ def oldasm(text):
         patches[loc] = g
         prev = text.rfind('\n',loc)
         if prev != -1:
-          print text[start:prev]
+          print( text[start:prev])
           start = text.find('\n',loc)
-          print '---'
-          print text[prev:start]
-          print '---'
-          print text[start:end]
-          print 'ORIGINAL'
-          print text
+          print( '---')
+          print( text[prev:start])
+          print( '---')
+          print( text[start:end])
+          print( 'ORIGINAL')
+          print( text)
           raise Exception
-        print 'OPTIMIZATION OPPORTUNITY: %s'%text'''
+        print( 'OPTIMIZATION OPPORTUNITY: %s'%text)'''
   return _asm(text)

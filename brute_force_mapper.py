@@ -36,7 +36,7 @@ class BruteForceMapper(Mapper):
       raise NotImplementedError( 'Architecture %s is not supported'%arch )
 
   def gen_mapping(self):
-    print 'Generating mapping...'
+    print( 'Generating mapping...')
     mapping = {}
     maplist = []
     currmap = {}
@@ -80,7 +80,7 @@ class BruteForceMapper(Mapper):
       mapping[self.context.secondary_lookup_function_offset] = self.context.secondary_lookup_function_offset
     #Don't yet know mapping offset; we must compute it
     mapping[len(self.bytes)+self.base] = offset
-    print 'final offset for mapping is: 0x%x' % offset
+    print( 'final offset for mapping is: 0x%x' % offset)
     if not self.context.write_so:
       #For NOW, place the global data/function at the end of this because we can't necessarily fit
       #another section.  TODO: put this somewhere else
@@ -96,7 +96,7 @@ class BruteForceMapper(Mapper):
     return mapping
 
   def gen_newcode(self,mapping):
-    print 'Generating new code...'
+    print( 'Generating new code...')
     newbytes = ''
     bytemap = {}
     maplist = []
@@ -130,7 +130,7 @@ class BruteForceMapper(Mapper):
         newbytes+=m[k]
     if not self.context.write_so:
       newbytes+=self.runtime.get_auxvec_code(mapping[self.entry])
-    print 'mapping is being placed at offset: 0x%x' % len(newbytes)
+    print( 'mapping is being placed at offset: 0x%x' % len(newbytes))
     #Append mapping to end of bytes
     newbytes+=self.write_mapping(mapping,self.base,len(self.bytes))
     return newbytes
@@ -140,10 +140,10 @@ class BruteForceMapper(Mapper):
     for addr in range(base,base+size):
       if addr in mapping:
         if addr < 10:
-          print 'offset for 0x%x: 0x%x' % (addr, mapping[addr])
+          print( 'offset for 0x%x: 0x%x' % (addr, mapping[addr]))
         bytes+=struct.pack('<I',mapping[addr]) #Write our offset in little endian
       else:
-        #print 'No mapping for 0x%x'%addr
+        #print( 'No mapping for 0x%x'%addr)
         bytes+=struct.pack('<I',0xffffffff) #Write an invalid offset if not in mapping
-    print 'last address in mapping was 0x%x'%(base+size)
+    print( 'last address in mapping was 0x%x'%(base+size))
     return bytes

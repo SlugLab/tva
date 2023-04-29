@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 from elftools.elf.elffile import ELFFile
 import capstone
 import sys
@@ -130,7 +130,7 @@ class Rewriter(object):
       entry = elffile.header.e_entry #application entry point
       for section in elffile.iter_sections():
         if section.name == '.text':
-          print "Found .text"
+          print("Found .text")
           offs = section.header.sh_offset
           size = section.header.sh_size
           addr = section.header.sh_addr
@@ -170,21 +170,21 @@ class Rewriter(object):
             self.context.plt['entries'][got_off] = name #Insert this mapping from GOT offset address to symbol name
         #print self.context.plt
       else:
-          print 'binary does not contain plt'
+          print('binary does not contain plt')
       if self.context.write_so:
-        print 'Writing as .so file'
+        print('Writing as .so file')
         self.context.newbase = self.find_newbase(elffile)
       elif self.context.exec_only:
-        print 'Writing ONLY main binary, without support for rewritten .so files'
+        print( 'Writing ONLY main binary, without support for rewritten .so files')
         self.context.newbase = 0x09000000
       else:
-        print 'Writing as main binary'
+        print( 'Writing as main binary')
         self.context.newbase = 0x09000000
       if self.context.no_pic:
-        print 'Rewriting without support for generic PIC'
+        print( 'Rewriting without support for generic PIC')
       for seg in elffile.iter_segments():
         if seg.header['p_flags'] == 5 and seg.header['p_type'] == 'PT_LOAD': #Executable load seg
-          print "Base address: %s"%hex(seg.header['p_vaddr'])
+          print( "Base address: %s"%hex(seg.header['p_vaddr']))
           bytes = seg.data()
           base = seg.header['p_vaddr']
           mapper = BruteForceMapper(arch,bytes,base,entry,self.context)
@@ -195,7 +195,7 @@ class Rewriter(object):
           #I only need one byte for the global flag, so I am adding a tiny bit to TLS
           #add_tls_section returns the offset, but we must make it negative
           self.context.global_flag = -bin_write.add_tls_section(fname,b'\0')
-          print 'just set global_flag value to 0x%x'%self.context.global_flag
+          print('just set global_flag value to 0x%x'%self.context.global_flag)
           #maptext = write_mapping(mapping,base,len(bytes))
           #(mapping,newbytes) = translate_all(seg.data(),seg.header['p_vaddr'])
           #insts = md.disasm(newbytes[0x8048360-seg.header['p_vaddr']:0x8048441-seg.header['p_vaddr']],0x8048360)
@@ -220,8 +220,8 @@ class Rewriter(object):
             with open('newglobal','wb') as f2:
               f2.write(mapper.runtime.get_global_mapping_bytes())
           #print output
-          print mapping[base]
-          print mapping[base+1]
+          print( mapping[base])
+          print( mapping[base+1])
           maptext = mapper.write_mapping(mapping,base,len(bytes))
           cache = ''
           for x in maptext:
@@ -229,25 +229,25 @@ class Rewriter(object):
             cache+='%d,'%int(x.encode('hex'),16)
           #print cache
   	  #print maptext.encode('hex')
-          print '0x%x'%(base+len(bytes))
-  	  print 'code increase: %d%%'%(((len(newbytes)-len(bytes))/float(len(bytes)))*100)
+          print( '0x%x'%(base+len(bytes)))
+          print( 'code increase: %d%%'%(((len(newbytes)-len(bytes))/float(len(bytes)))*100))
           lookup = mapper.runtime.get_lookup_code(base,len(bytes),self.context.lookup_function_offset,0x8f)
-          print 'lookup w/unknown mapping %s'%len(lookup)
+          print( 'lookup w/unknown mapping %s'%len(lookup))
           #insts = md.disasm(lookup,0x0)
   	  #for ins in insts:
           #  print '0x%x:\t%s\t%s\t%s'%(ins.address,str(ins.bytes).encode('hex'),ins.mnemonic,ins.op_str)
           lookup = mapper.runtime.get_lookup_code(base,len(bytes),self.context.lookup_function_offset,mapping[self.context.mapping_offset])
-          print 'lookup w/known mapping %s'%len(lookup)
+          print( 'lookup w/known mapping %s'%len(lookup))
           #insts = md.disasm(lookup,0x0)
   	  #for ins in insts:
           #  print '0x%x:\t%s\t%s\t%s'%(ins.address,str(ins.bytes).encode('hex'),ins.mnemonic,ins.op_str)
           if not self.context.write_so:
-            print 'new entry point: 0x%x'%(self.context.newbase + self.context.new_entry_off)
-            print 'new _start point: 0x%x'%(self.context.newbase + mapping[entry])
-            print 'global lookup: 0x%x'%self.context.global_lookup
-          print 'local lookup: 0x%x'%self.context.lookup_function_offset
-          print 'secondary local lookup: 0x%x'%self.context.secondary_lookup_function_offset
-          print 'mapping offset: 0x%x'%mapping[self.context.mapping_offset]
+            print( 'new entry point: 0x%x'%(self.context.newbase + self.context.new_entry_off))
+            print( 'new _start point: 0x%x'%(self.context.newbase + mapping[entry]))
+            print( 'global lookup: 0x%x'%self.context.global_lookup)
+          print( 'local lookup: 0x%x'%self.context.lookup_function_offset)
+          print( 'secondary local lookup: 0x%x'%self.context.secondary_lookup_function_offset)
+          print( 'mapping offset: 0x%x'%mapping[self.context.mapping_offset])
           with open('%s-r-map.json'%fname,'wb') as f:
             json.dump(mapping,f)
           if not self.context.write_so:

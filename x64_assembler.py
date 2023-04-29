@@ -68,7 +68,7 @@ def asm(text):
     elif pat3.match(line):
       #mov eax, dword ptr [0xcafecafe]
       if ' word' in line:
-        print 'WARNING: silently converting "mov eax, word ptr [<number>]" to "mov eax, dword ptr [<number>]"'
+        print( 'WARNING: silently converting "mov eax, word ptr [<number>]" to "mov eax, dword ptr [<number>]"')
       code+=b'\xa1' + struct.pack('<I',int(line[line.find('[')+1:line.find(']')],16) )
     #Check for mov instruction to eax from some register plus or minus an offset
     #NOTE: This does NOT WORK for esp!  The instruction encoding pattern is DIFFERENT!
@@ -101,12 +101,12 @@ def asm(text):
         newcode = newcode[0:2]+original
       #f.write(str(newcode).encode('hex')+'\n')
       #if newcode != ocode:
-      #  print 'NO MATCH %s:\n%s\n%s'%(line,newcode.encode('hex'),ocode.encode('hex'))
+      #  print( 'NO MATCH %s:\n%s\n%s'%(line,newcode.encode('hex'),ocode.encode('hex')))
       #  raise Exception
       #f.close() 
       code+=newcode
     elif pat6.match(line):
-      print 'WARNING: Using assumption to efficiently assemble "%s"' % line
+      print( 'WARNING: Using assumption to efficiently assemble "%s"' % line)
       #ocode = _asm(line)
       m = pat6.match(line)
       amount = int(m.group('amount'))
@@ -119,17 +119,17 @@ def asm(text):
         newcode = _asm('%s %s,0x7f'%(mnemonic,register) )
         newcode = newcode[:2] + struct.pack('<b',amount)
       #if newcode != ocode:
-      #  print 'NO MATCH %s:\n%s\n%s'%(line,newcode.encode('hex'),ocode.encode('hex'))
+      #  print( 'NO MATCH %s:\n%s\n%s'%(line,newcode.encode('hex'),ocode.encode('hex')))
       #  raise Exception
       code+=newcode
     elif pat7.match(line):
-      print 'WARNING: silently converting "mov eax, word ptr [<value>]" to "mov eax, dword ptr [<value>]"'
+      print( 'WARNING: silently converting "mov eax, word ptr [<value>]" to "mov eax, dword ptr [<value>]"')
       code+=_asm(line.replace(' word',' dword'))
     elif pat8.match(line):
-      print 'WARNING: silently converting "mov eax, <letter>[xip]" to "mov eax, e<letter>[xip]"'
+      print( 'WARNING: silently converting "mov eax, <letter>[xip]" to "mov eax, e<letter>[xip]"')
       code+=_asm(line.replace(', ',', e'))
     elif rip_with_offset.search(line):
-      #print 'WARNING: using assumption to efficiently assemble "%s"' % line
+      #print( 'WARNING: using assumption to efficiently assemble "%s"' % line)
       m = rip_with_offset.search(line)
       newstr = rip_with_offset.sub('[rip]', line)
       if newstr in metacache:
@@ -137,7 +137,7 @@ def asm(text):
         newcode = _asm( newstr )
         if m.group('offset'):
           #immediate = newcode[-metacache[newstr]:] if newstr in metacache else b''
-          #print 'WARNING: using assumption to efficiently assemble "%s"' % line
+          #print( 'WARNING: using assumption to efficiently assemble "%s"' % line)
           # Replace 4 bytes of displacement with little-endian encoded offset retrieved from the original assembly
           #code += newcode[:-(4+len(immediate))] + struct.pack( '<i', int(m.group('offset'),16) ) + immediate
           code += newcode[:metacache[newstr]] + struct.pack( '<i', int(m.group('offset'),16) ) + newcode[metacache[newstr]+4:]
