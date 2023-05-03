@@ -6,8 +6,8 @@
 |*                                                                            *|
 \*===----------------------------------------------------------------------===*/
 
-/* Capstone Disassembly Engine, http://www.capstone-engine.org */
-/* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2014 */
+/* Capstone Disassembly Engine, https://www.capstone-engine.org */
+/* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2015 */
 
 
 #ifdef GET_SUBTARGETINFO_ENUM
