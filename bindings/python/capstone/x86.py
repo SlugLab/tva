@@ -45,15 +45,6 @@ class X86Op(ctypes.Structure):
 
 class CsX86Encoding(ctypes.Structure):
     _fields_ = (
-        #('modrm_offset', ctypes.c_uint8),
-        ('disp_offset', ctypes.c_uint8),
-        ('disp_size', ctypes.c_uint8),
-        ('imm_offset', ctypes.c_uint8),
-        ('imm_size', ctypes.c_uint8),
-    )
-
-class CsX86Encoding(ctypes.Structure):
-    _fields_ = (
         ('modrm_offset', ctypes.c_uint8),
         ('disp_offset', ctypes.c_uint8),
         ('disp_size', ctypes.c_uint8),

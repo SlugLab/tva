@@ -939,12 +939,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	info.offset = address;
 
 	if (instr->flat_insn->detail) {
-		// instr->flat_insn->detail initialization: 3 alternatives
-
-		memset(instr->flat_insn->detail->x86.prefix, 0, sizeof(instr->flat_insn->detail->x86.prefix));
-		memset(instr->flat_insn->detail->x86.opcode, 0, sizeof(instr->flat_insn->detail->x86.opcode));
-		memset(instr->flat_insn->detail->x86.operands, 0, sizeof(instr->flat_insn->detail->x86.operands));
-		memset(&instr->flat_insn->detail->x86.encoding, 0, sizeof(instr->flat_insn->detail->x86.encoding));
+		// instr->flat_insn->detail initialization: cherry picked optioon 2
+		memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
 	}
 
 	if (handle->mode & CS_MODE_16)
