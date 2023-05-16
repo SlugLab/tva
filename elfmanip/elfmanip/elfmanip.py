@@ -7,7 +7,7 @@ from elftools.elf.descriptions import describe_p_type
 from elftools.elf.elffile import ELFFile
 from elftools.elf.enums import ENUM_SH_TYPE_BASE, ENUM_P_TYPE_BASE, ENUM_E_TYPE, ENUM_E_MACHINE, ENUM_E_VERSION
 
-from constants import (SHF_WRITE,
+from elfmanip.constants import (SHF_WRITE,
                        SHF_ALLOC,
                        SHF_EXECINSTR,
                        SHN_UNDEF,
@@ -486,8 +486,8 @@ class ELFManip(object):
         ''' Get the section header table which includes all of the original section header entries
             plus all of the entries for the custom sections
         '''
-        ret = ''.join(s.dump_entry() for s in self.shdrs['entries'])
-        ret += ''.join(s.dump_entry() for s in self.custom_sections)
+        ret = b''.join(s.dump_entry() for s in self.shdrs['entries'])
+        ret += b''.join(s.dump_entry() for s in self.custom_sections)
         return ret
 
     def dump_phdrs(self):
@@ -497,7 +497,7 @@ class ELFManip(object):
         for phdr in self.phdrs['entries']:
             if isinstance(phdr, CustomSegment):
                 phdr.finalize()
-        return ''.join(p.dump_entry() for p in self.phdrs['entries'])
+        return b''.join(p.dump_entry() for p in self.phdrs['entries'])
 
     def write_new_elf(self, outfile):
         if outfile == self.filename:
@@ -823,7 +823,7 @@ class CustomSegment(Segment):
             self.p_flags = self._union_section_flags()
 
 
-def pad_to_modulus(f, modulus, padding_bytes='\x00', pad_if_aligned=False):
+def pad_to_modulus(f, modulus, padding_bytes=b'\x00', pad_if_aligned=False):
     ''' Pad file object f using padding_bytes
         @param f: file-like object
         @param modulus: when to stop adding the padding
@@ -839,4 +839,4 @@ def pad_to_modulus(f, modulus, padding_bytes='\x00', pad_if_aligned=False):
 
     padding_len = modulus - (current % modulus)
     logger.debug("padding EOF with %d null bytes", padding_len)
-    f.write(padding_bytes * (padding_len / len(padding_bytes)) + padding_bytes[:padding_len % len(padding_bytes)])
+    f.write(padding_bytes * (padding_len // len(padding_bytes)) + padding_bytes[:padding_len % len(padding_bytes)])
