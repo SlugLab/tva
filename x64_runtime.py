@@ -380,7 +380,7 @@ class X64Runtime(object):
 	pop rsi
 	pop rdi
 	pop rax
-    ''' % ( (self.context.oldbase/0x1000)*0x1000, self.context.global_lookup - 0x20000, self.context.oldbase, 0x1000-(self.context.oldbase%0x1000), (self.context.oldbase/0x1000)*0x1000 )
+    ''' % ( (self.context.oldbase//0x1000)*0x1000, self.context.global_lookup - 0x20000, self.context.oldbase, 0x1000-(self.context.oldbase%0x1000), (self.context.oldbase//0x1000)*0x1000 )
     
     return _asm(auxvec_template%(self.context.global_sysinfo,self.context.global_lookup+self.context.popgm_offset,restoretext if self.context.move_phdrs_to_text else '',self.context.newbase+entry))
 
@@ -411,7 +411,7 @@ class X64Runtime(object):
     '''
     popgmbytes = asm(call_popgm%(self.context.global_sysinfo+8))
     with open('x64_%s' % self.context.popgm) as f:
-      popgmbytes+=f.read()
+      popgmbytes+=f.read().encode()
     return popgmbytes
 
   def get_global_mapping_bytes(self):
@@ -419,13 +419,13 @@ class X64Runtime(object):
     globalbytes = self.get_global_lookup_code()
     #globalbytes+='\0' #flag field
     globalbytes += self.get_popgm_code()
-    globalbytes += '\0\0\0\0\0\0\0\0' #sysinfo field
+    globalbytes += b'\0\0\0\0\0\0\0\0' #sysinfo field
     # Global mapping (0x6000 0x00 bytes).  This contains space for 1024 entries:
     # 8 * 3 = 24 bytes per entry * 1024 entries = 0x6000 (24576) bytes.  If a binary
     # has more than 1024 libraries, the program will most likely segfault.
-    globalbytes += '\x00'*0x6000
+    globalbytes += b'\x00'*0x6000
     # Allocate extra space for any additional global variables that
     # instrumentation code might require
     if self.context.alloc_globals > 0:
-      globalbytes += '\x00'*self.context.alloc_globals
+      globalbytes += b'\x00'*self.context.alloc_globals
     return globalbytes

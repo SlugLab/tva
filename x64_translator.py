@@ -36,11 +36,11 @@ class X64Translator(Translator):
         # rip with that value, derived from the NEW value in rip...
         match = self.rip_with_offset.search(ins.op_str) #TODO: all this new stuff with the match and then the assembler optimization
         if mapping is not None:
-          #print 'rewriting %s instruction with rip: %s %s' % (ins.mnemonic,ins.mnemonic,ins.op_str) 
+          #print( 'rewriting %s instruction with rip: %s %s' % (ins.mnemonic,ins.mnemonic,ins.op_str) )
           oldoffset = 0 #Assume at first that there is no offset from rip
           if match.group('offset') != None:
-            #print 'match on offset: %s' % match.group('offset')
-            oldoffset = int(match.group('offset'), 16)
+            #print(f'match on offset: {match.group("offset")} as "{match.group("offset").replace(" ","")}", of {ins.op_str}')
+            oldoffset = int(match.group("offset").replace(" ",""), 16)
           oldaddr = ins.address + len(ins.bytes)
           # For completely rewritten instructions, the new length will indeed change, because the original instruction
           # may be rewritten into multiple instructions, with potentially many instructions inserted before the one
@@ -53,22 +53,22 @@ class X64Translator(Translator):
           newopstr = ''
           # If the new offset cannot be encoded in 4 bytes, replace it with a placeholder
           if newoffset <= -0x80000000 or newoffset >= 0x7fffffff:
-            print 'WARNING: unencodable offset for instruction @ 0x%x: %x' % (ins.address,newoffset)
+            print( 'WARNING: unencodable offset for instruction @ 0x%x: %x' % (ins.address,newoffset))
             newoffset = -0x7faddead
           # Check whether it's negative so we can prefix with 0x even with negative numbers
           if newoffset < 0:
             newopstr = self.rip_with_offset.sub('[rip - 0x%x]' % -newoffset, ins.op_str)
           else:
             newopstr = self.rip_with_offset.sub('[rip + 0x%x]' % newoffset, ins.op_str)
-          #print 'Old offset: 0x%x / Old address: 0x%x / New address: 0x%x / New base: 0x%x' % (oldoffset,oldaddr,newaddr,self.context.newbase)
-          #print 'New instruction: %s %s' % (ins.mnemonic,newopstr)
+          #print( 'Old offset: 0x%x / Old address: 0x%x / New address: 0x%x / New base: 0x%x' % (oldoffset,oldaddr,newaddr,self.context.newbase))
+          #print( 'New instruction: %s %s' % (ins.mnemonic,newopstr))
           return newopstr
         else:
           #Placeholder until we know the new instruction location
           newopstr = self.rip_with_offset.sub('[rip]', ins.op_str)
-          #print 'rewriting %s instruction with rip: %s %s' % (ins.mnemonic,ins.mnemonic,ins.op_str) 
-          #print 'assembling %s %s' % (ins.mnemonic, newopstr)
-          #print 'instruction is %s' % str(ins.bytes[:-4] + (b'\0'*4)).encode('hex')
+          #print( 'rewriting %s instruction with rip: %s %s' % (ins.mnemonic,ins.mnemonic,ins.op_str) )
+          #print( 'assembling %s %s' % (ins.mnemonic, newopstr))
+          #print( 'instruction is %s' % str(ins.bytes[:-4] + (b'\0'*4)).encode('hex'))
           newins = '%s %s' % (ins.mnemonic, newopstr)
           # Pre-populate cache with version of this instruction with NO offset; this means we never have to call assembler for this instruction.
           # The assembler can just replace the offset, which we assume is the last 4 bytes in the instruction
@@ -81,8 +81,8 @@ class X64Translator(Translator):
             # ---
             # The displacement size and offset are not easily obtainable in the current version of capstone, so this requires a customized version that
             # provides access to this data.  With this, we can determine exactly the position of the displacement and replace it
-            disp_size = ins._detail.arch.x86.encoding.disp_size
-            disp_offset = ins._detail.arch.x86.encoding.disp_offset
+            disp_size = ins._raw.detail.contents.arch.x86.encoding.disp_size
+            disp_offset = ins._raw.detail.contents.arch.x86.encoding.disp_offset
             # We will only automatically replace 4-byte displacements, because smaller ones will very likely not fit the new displacement, and 4-byte
             # displacements are much more common.  This means we will need to re-assemble any instructions that do not have a 4-byte displacement, however.
             if disp_size == 4:
@@ -93,7 +93,7 @@ class X64Translator(Translator):
               # TODO: Changing the instruction to use a larger displacement WILL change the instruction length, and thus WILL result in an incorrect new
               # displacement as we calculate it now.  This needs to be fixed to use the correct new displacement as it would be calculated after knowing
               # the new instruction length.
-              print 'WARNING: instruction %s has small displacement: %d'%(newins,disp_size)
+              print( 'WARNING: instruction %s at [%x] has small displacement: %d'%(newins,ins.address, disp_size))
           return newopstr
 
   def translate_one(self,ins,mapping):
@@ -104,8 +104,8 @@ class X64Translator(Translator):
     elif ins.mnemonic == 'ret':
       return self.translate_ret(ins,mapping)
     elif ins.mnemonic in ['retn','retf','repz']: #I think retn is not used in Capstone
-      #print 'WARNING: unimplemented %s %s'%(ins.mnemonic,ins.op_str)
-      return '\xf4\xf4\xf4\xf4' #Create obvious cluster of hlt instructions
+      #print( 'WARNING: unimplemented %s %s'%(ins.mnemonic,ins.op_str))
+      return b'\xf4\xf4\xf4\xf4' #Create obvious cluster of hlt instructions
     else: #Any other instruction
       inserted = self.before_inst_callback(ins)
       #Even for non-control-flow instructions, we need to replace all references to rip
@@ -132,10 +132,10 @@ class X64Translator(Translator):
         '''asm1 = asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping) ) )
         asm2 = asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,None) ) )
         if len(asm1) != len(asm2):
-          print '%s %s @ 0x%x LENGTH FAIL1: %s vs %s' % (ins.mnemonic, ins.op_str, ins.address, str(asm1).encode('hex'), str(asm2).encode('hex') )
+          print( '%s %s @ 0x%x LENGTH FAIL1: %s vs %s' % (ins.mnemonic, ins.op_str, ins.address, str(asm1).encode('hex'), str(asm2).encode('hex') ))
           newone = len( asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping) ) ) )
           oldone = len( asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,None) ) ) )
-          print '%d vs %d, %d vs %d' % (newone,oldone,len(asm1),len(asm2))'''
+          print( '%d vs %d, %d vs %d' % (newone,oldone,len(asm1),len(asm2)))'''
         code = b''
         if inserted is not None:
           code = asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping,len(inserted) + len(ins.bytes) ) ) )
@@ -144,10 +144,10 @@ class X64Translator(Translator):
           code = asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping,len(ins.bytes) ) ) )
         return code
       else:
-	'''if 'rip' in ins.op_str and (ins.mnemonic in incompatible):
-          print 'NOT rewriting %s instruction with rip: %s %s' % (ins.mnemonic,ins.mnemonic,ins.op_str) 
+        '''if 'rip' in ins.op_str and (ins.mnemonic in incompatible):
+          print( 'NOT rewriting %s instruction with rip: %s %s' % (ins.mnemonic,ins.mnemonic,ins.op_str) )
         if ins.mnemonic == 'ljmp':
-          print 'WARNING: unhandled %s %s @ %x'%(ins.mnemonic,ins.op_str,ins.address)'''
+          print( 'WARNING: unhandled %s %s @ %x'%(ins.mnemonic,ins.op_str,ins.address))'''
         if inserted is not None:
           return inserted + str(ins.bytes)
       return None #No translation needs to be done
@@ -223,10 +223,10 @@ class X64Translator(Translator):
       else:
         patched+=asm(jecxz_template)
       newtarget = self.remap_target(ins.address,mapping,target,len(patched))
-      #print 'want %s, but have %s instead'%(remap_target(ins.address,mapping,target,len(patched)), newtarget)
+      #print( 'want %s, but have %s instead'%(remap_target(ins.address,mapping,target,len(patched)), newtarget))
       #Apparently the offset for jcxz and jecxz instructions may have been wrong?  How did it work before?
       patched += asm('jz $+%s'%newtarget)
-      #print 'code length: %d'%len(patched)
+      #print( 'code length: %d'%len(patched))
       
       #TODO: some instructions encode to 6 bytes, some to 5, some to 2.  How do we know which?
       #For example, for CALL, it seems to only be 5 or 2 depending on offset.
@@ -289,9 +289,9 @@ class X64Translator(Translator):
       else:
         self.context.stat['dirjmp']+=1
       newtarget = self.remap_target(ins.address,mapping,target,len(code))
-      #print "(pre)new length: %s"%len(callback_code)
-      #print "target: %s"%hex(target)
-      #print "newtarget: %s"%newtarget
+      #print( "(pre)new length: %s"%len(callback_code))
+      #print( "target: %s"%hex(target))
+      #print( "newtarget: %s"%newtarget)
       # Again, there is no thunk special case for 64-bit code
       if self.context.no_pic: # and target != self.context.get_pc_thunk:
         code += asm( '%s $+%s'%(ins.mnemonic,newtarget) )
@@ -300,7 +300,7 @@ class X64Translator(Translator):
         if len(patched) == 2: #Short encoding, which we do not want
           patched+='\x90\x90\x90' #Add padding of 3 NOPs
         code += patched
-      #print "new length: %s"%len(callback_code+patched)
+      #print( "new length: %s"%len(callback_code+patched))
       return code
     return None
   
@@ -358,10 +358,10 @@ class X64Translator(Translator):
     #can look up the new address using the original
     if 'rip' in target:
       '''if len( asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping) ) ) ) != len( asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,None) ) ) ):
-        print '%s %s @ 0x%x LENGTH FAIL2: %s vs %s' % (ins.mnemonic, ins.op_str, ins.address, str(asm('%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping) ))).encode('hex'), str(asm('%s %s' % (ins.mnemonic, self.replace_rip(ins,None)) )).encode('hex') )
+        print( '%s %s @ 0x%x LENGTH FAIL2: %s vs %s' % (ins.mnemonic, ins.op_str, ins.address, str(asm('%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping) ))).encode('hex'), str(asm('%s %s' % (ins.mnemonic, self.replace_rip(ins,None)) )).encode('hex') ))
         newone = len( asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping) ) ) )
         oldone = len( asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,None) ) ) )
-        print '%d vs %d, %s' % (newone,oldone,newone == oldone)'''
+        print( '%d vs %d, %s' % (newone,oldone,newone == oldone))'''
       # The new "instruction length" is the length of all preceding code, plus the instructions up through the one referencing rip
       target = self.replace_rip(ins,mapping,len(code) + len(asm('mov [rsp-64],rax\nmov rax,[rip]')) )
     if self.context.no_pic:
@@ -415,7 +415,7 @@ class X64Translator(Translator):
       address = (ins.address + len(ins.bytes)) + int(match.group('offset'), 16)
       if address in self.context.plt['entries']:
         if self.context.plt['entries'][address] in self.context.callbacks:
-          print 'Found library call with callbacks: %s'%self.context.plt['entries'][address]
+          print( 'Found library call with callbacks: %s'%self.context.plt['entries'][address])
           return self.get_callback_code( ins.address, mapping, self.context.callbacks[self.context.plt['entries'][address]] )
     return b''
   
@@ -467,6 +467,6 @@ class X64Translator(Translator):
     if mapping is not None and target in mapping:#Second pass, known mapping
       newtarget = mapping[target]-(mapping[addr]+offs) #Offset from curr location in mapping
       newtarget = hex(newtarget)
-      #print "original target: %s"%hex(target)
-      #print "%s-(%s+%s) = %s"%(hex(mapping[target]),hex(mapping[addr]),hex(offs),newtarget)
+      #print( "original target: %s"%hex(target))
+      #print( "%s-(%s+%s) = %s"%(hex(mapping[target]),hex(mapping[addr]),hex(offs),newtarget))
     return newtarget

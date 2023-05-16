@@ -56,7 +56,7 @@ def asm(text):
       newcode = _asm(line) #Assembled code with dummy offset
       if mnemonic in ['jmp','call']:
         off-=5 #Subtract 5 because the large encoding knows it's 5 bytes long
-        newcode = newcode[0]+struct.pack('<i',off) #Signed int for negative jumps 
+        newcode = newcode[0:1]+struct.pack('<i',off) #Signed int for negative jumps
       elif mnemonic in JCC:
         off-=6 #Subtract 6 because the large encoding knows it's 6 bytes long
         newcode = newcode[0:2]+struct.pack('<i',off) #Signed int for negative jumps
@@ -140,7 +140,7 @@ def asm(text):
           #print( 'WARNING: using assumption to efficiently assemble "%s"' % line)
           # Replace 4 bytes of displacement with little-endian encoded offset retrieved from the original assembly
           #code += newcode[:-(4+len(immediate))] + struct.pack( '<i', int(m.group('offset'),16) ) + immediate
-          code += newcode[:metacache[newstr]] + struct.pack( '<i', int(m.group('offset'),16) ) + newcode[metacache[newstr]+4:]
+          code += newcode[:metacache[newstr]] + struct.pack( '<i', int(m.group('offset').replace(" ",""),16) ) + newcode[metacache[newstr]+4:]
         else:
           code += newcode
       else:

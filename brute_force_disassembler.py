@@ -31,7 +31,7 @@ class BruteForceDisassembler(Disassembler):
         try:
           if not off in dummymap: #If this offset has not been disassembled
             insts = self.md.disasm(bytes[instoff:instoff+15],base+instoff)#longest x86/x64 instr is 15 bytes
-            ins = insts.next() #May raise StopIteration
+            ins = next(insts) #May raise StopIteration
             instoff+=len(ins.bytes)
             dummymap[ins.address] = True # Show that we have disassembled this address
             yield ins
@@ -40,5 +40,6 @@ class BruteForceDisassembler(Disassembler):
             break #Stop disassembling from this starting offset
         except StopIteration: #Not a valid instruction
           break #Stop disassembling from this starting offset
-    raise StopIteration
+    # breaks things in python3
+    #raise StopIteration
 

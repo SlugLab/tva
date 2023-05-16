@@ -97,7 +97,7 @@ class BruteForceMapper(Mapper):
 
   def gen_newcode(self,mapping):
     print( 'Generating new code...')
-    newbytes = ''
+    newbytes = b''
     bytemap = {}
     maplist = []
     last = None #Last instruction disassembled
@@ -108,7 +108,7 @@ class BruteForceMapper(Mapper):
         reroute = assembler.asm( 'jmp $+%s'%(next_target) )
         #Maximum relative displacement is 32 for x86 and x64, so this works for both platforms
         if len(reroute) == 2: #Short encoding, which we do not want
-          reroute+='\x90\x90\x90' #Add padding of 3 NOPs
+          reroute += b"\x90\x90\x90" #Add padding of 3 NOPs
         bytemap[last.address] += reroute
         last = None
         maplist.append(bytemap)
@@ -119,7 +119,7 @@ class BruteForceMapper(Mapper):
         if newins is not None:
           bytemap[ins.address] = newins #Old address maps to these new instructions
         else:
-          bytemap[ins.address] = str(ins.bytes) #This instruction is unchanged, and its old address maps to it
+          bytemap[ins.address] = ins.bytes #This instruction is unchanged, and its old address maps to it
     #Add the lookup function as the first thing in the new text section
     newbytes+=self.runtime.get_lookup_code(self.base,len(self.bytes),self.context.lookup_function_offset,mapping[self.context.mapping_offset])
     if self.context.exec_only:

@@ -225,8 +225,7 @@ class Rewriter(object):
           maptext = mapper.write_mapping(mapping,base,len(bytes))
           cache = ''
           for x in maptext:
-            #print x
-            cache+='%d,'%int(x.encode('hex'),16)
+            cache+=f'{x},'
           #print cache
   	  #print maptext.encode('hex')
           print( '0x%x'%(base+len(bytes)))
@@ -248,7 +247,7 @@ class Rewriter(object):
           print( 'local lookup: 0x%x'%self.context.lookup_function_offset)
           print( 'secondary local lookup: 0x%x'%self.context.secondary_lookup_function_offset)
           print( 'mapping offset: 0x%x'%mapping[self.context.mapping_offset])
-          with open('%s-r-map.json'%fname,'wb') as f:
+          with open('%s-r-map.json'%fname,'wt') as f:
             json.dump(mapping,f)
           if not self.context.write_so:
             bin_write.rewrite(fname,fname+'-r','newbytes',self.context.newbase,mapper.runtime.get_global_mapping_bytes(),self.context.global_lookup,self.context.newbase+self.context.new_entry_off,offs,size,self.context.num_new_segments,arch)
@@ -274,7 +273,7 @@ class Rewriter(object):
               self.context.stat['popgmsize'] = len(tmp)
             self.context.stat['globmapsectionsize'] = len(mapper.runtime.get_global_mapping_bytes())
             self.context.stat['globlookupsize'] = len(mapper.runtime.get_global_lookup_code())
-          with open('%s-r-stat.json'%fname,'wb') as f:
+          with open('%s-r-stat.json'%fname,'wt') as f:
             json.dump(self.context.stat,f,sort_keys=True,indent=4,separators=(',',': '))
           
 '''
