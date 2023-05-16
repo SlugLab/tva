@@ -20,8 +20,8 @@ def add_tls_section(fname,contents):
     global tls_section_contents
     tls_section_added = True
     #Pad contents to 4-byte alignment
-    tls_section_contents = contents+('\0'*(4-len(contents)%4))
-    with open(fname) as f:
+    tls_section_contents = contents+(b'\0'*(4-len(contents)%4))
+    with open(fname, "rb") as f:
         elf = ELFFile(f)
        	for s in elf.iter_segments():
             #Assume only one TLS segment exists (will fail on an already modified binary)
@@ -56,7 +56,7 @@ def get_tls_content(elf):
 
 def rewrite_noglobal(fname,nname,newcode,newbase,entry):
   elf = ELFManip(fname,num_adtl_segments=1)
-  with open(newcode) as f:
+  with open(newcode, "wb") as f:
     newbytes = f.read()
     elf.relocate_phdrs()
     newtext_section = CustomSection(newbytes, sh_addr = newbase)
@@ -74,7 +74,7 @@ def rewrite(fname,nname,newcode,newbase,newglobal,newglobalbase,entry,text_secti
   if text_section_size >= elf.ehdr['e_phentsize']*(elf.ehdr['e_phnum']+num_new_segments+1):
     num_new_segments += 1 # Add an extra segment for the overwritten contents of the text section
   newtls = get_tls_content(elf) #Right now there will ALWAYS be a new TLS section
-  with open(newcode) as f:
+  with open(newcode, "rb") as f:
     newbytes = f.read()
     # IF the text section is large enough to hold the phdrs (true for a nontrivial program)
     # AND the architecture is x86-64, because I have not written 32-bit code to restore the text section yet
