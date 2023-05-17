@@ -232,7 +232,7 @@ class ELFManip(object):
                 empty = True
                 self._file.seek(section_before_padding['sh_offset'] + section_before_padding['sh_size'])
                 for b in self._file.read(free_space_size):
-                    if b != "\x00":
+                    if b != 0:
                         empty = False
                 if not empty:
                     # not sure why this would ever happen in a "normal" compiler-generated binary

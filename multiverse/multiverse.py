@@ -221,7 +221,6 @@ class Rewriter(object):
               f2.write(mapper.runtime.get_global_mapping_bytes())
           #print output
           print( mapping[base])
-          print( mapping[base+1])
           maptext = mapper.write_mapping(mapping,base,len(bytes))
           cache = ''
           for x in maptext:
@@ -268,7 +267,7 @@ class Rewriter(object):
           if not self.context.write_so:
             self.context.stat['auxvecsize'] = len(mapper.runtime.get_auxvec_code(mapping[entry]))
             popgm = 'x86_popgm' if arch == 'x86' else 'x64_popgm' # TODO: if other architectures are added, this will need to be changed
-            with open(popgm) as f:
+            with open(popgm, "rb") as f:
               tmp=f.read()
               self.context.stat['popgmsize'] = len(tmp)
             self.context.stat['globmapsectionsize'] = len(mapper.runtime.get_global_mapping_bytes())

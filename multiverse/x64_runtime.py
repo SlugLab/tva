@@ -410,8 +410,8 @@ class X64Runtime(object):
     ret
     '''
     popgmbytes = asm(call_popgm%(self.context.global_sysinfo+8))
-    with open('x64_%s' % self.context.popgm) as f:
-      popgmbytes+=f.read().encode()
+    with open('x64_%s' % self.context.popgm, "rb") as f:
+      popgmbytes+=f.read()
     return popgmbytes
 
   def get_global_mapping_bytes(self):
