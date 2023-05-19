@@ -68,9 +68,9 @@ def rewrite_noglobal(fname,nname,newcode,newbase,entry):
     elf.set_entry_point(entry)
     elf.write_new_elf(nname)
 
-def rewrite(fname,nname,newcode,newbase,newglobal,newglobalbase,entry,text_section_offs,text_section_size,num_new_segments,arch):
+def rewrite(fname, nname, newcode, newbase, newglobal, newglobalbase, entry, text_section_offs, text_section_size, num_new_segments, arch):
   #TODO: change rewrite to take the context instead, and just retrieve the data it needs from that.
-  elf = ELFManip(fname,num_adtl_segments=num_new_segments)
+  elf = ELFManip(fname, num_adtl_segments=num_new_segments)
   if text_section_size >= elf.ehdr['e_phentsize']*(elf.ehdr['e_phnum']+num_new_segments+1):
     num_new_segments += 1 # Add an extra segment for the overwritten contents of the text section
   newtls = get_tls_content(elf) #Right now there will ALWAYS be a new TLS section
@@ -94,24 +94,26 @@ def rewrite(fname,nname,newcode,newbase,newglobal,newglobalbase,entry,text_secti
       # Use the previous heuristics to relocate the phdrs and hope for the best
       print( '.text section too small to hold phdrs (or 32-bit binary); using other heuristics to relocate phdrs')
       elf.relocate_phdrs()
+
     newtext_section = CustomSection(newbytes, sh_addr = newbase)
     newglobal_section = CustomSection(newglobal, sh_addr = newglobalbase)
     newtls_section = CustomSection(newtls, sh_addr = newglobalbase-0x10000) #TODO: make this address flexible
     if newtext_section is None or newglobal_section is None:
       raise Exception
     newtext_segment = CustomSegment(PT_LOAD)
-    newtext_segment = elf.add_segment(newtext_segment)
     newglobal_segment = CustomSegment(PT_LOAD)
-    newglobal_segment = elf.add_segment(newglobal_segment)
-    elf.add_section(newtext_section, newtext_segment)
-    elf.add_section(newglobal_section, newglobal_segment)
-    
-    newtls_segment = CustomSegment(PT_LOAD)
-    newtls_segment = elf.add_segment(newtls_segment)
-    elf.add_section(newtls_section, newtls_segment)
+    newtlsload_segment = CustomSegment(PT_LOAD)
     newtls_segment = CustomSegment(PT_TLS, p_align=4)
+
+    newtlsload_segment = elf.add_segment(newtlsload_segment)
     newtls_segment = elf.add_segment(newtls_segment)
+    newglobal_segment = elf.add_segment(newglobal_segment)
+    newtext_segment = elf.add_segment(newtext_segment)
+
+    elf.add_section(newtls_section, newtlsload_segment)
     elf.add_section(newtls_section, newtls_segment)
+    elf.add_section(newglobal_section, newglobal_segment)
+    elf.add_section(newtext_section, newtext_segment)
 
     elf.set_entry_point(entry)
     elf.write_new_elf(nname)
