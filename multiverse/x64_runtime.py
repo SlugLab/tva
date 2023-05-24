@@ -323,6 +323,8 @@ class X64Runtime(object):
     auxvec_template = '''
   	mov [rsp-8],rsi
   	mov [rsp-16],rcx
+    lea rcx, [rip-17]
+    mov [rsp-24], rcx
   	mov rsi,[rsp]
   	mov rcx,rsp
   	lea rcx,[rcx+rsi*8+8]
@@ -344,14 +346,19 @@ class X64Runtime(object):
   	mov rsi,[rcx+8]
   	mov [%s],rsi
     restore:
+    mov rcx,[rsp-24]
+    add rcx, %s
+    mov [rsp-32], rcx
+    mov rcx,[rsp-24]
+    add rcx, %s
+    mov [rsp-24], rcx
   	mov rsi,[rsp-8]
   	mov rcx,[rsp-16]
-    	push %s
-    	call [rsp]
+       call [rsp-24]
     	add rsp,8
 	%s
-    	mov QWORD PTR [rsp-16], %s
-  	jmp [rsp-16]'''
+       add rsp,8
+       jmp [rsp-32]'''
     restoretext = '''
 	push rax		
 	push rdi
@@ -381,8 +388,12 @@ class X64Runtime(object):
 	pop rdi
 	pop rax
     ''' % ( (self.context.oldbase//0x1000)*0x1000, self.context.global_lookup - 0x20000, self.context.oldbase, 0x1000-(self.context.oldbase%0x1000), (self.context.oldbase//0x1000)*0x1000 )
-    
-    return _asm(auxvec_template%(self.context.global_sysinfo,self.context.global_lookup+self.context.popgm_offset,restoretext if self.context.move_phdrs_to_text else '',self.context.newbase+entry))
+    print(f"popgm offset is {hex(self.context.popgm_offset)}")
+    return _asm(auxvec_template%(
+        self.context.global_sysinfo,
+        entry-self.context.new_entry_off,
+        self.context.global_lookup+self.context.popgm_offset - self.context.new_entry_off - self.context.newbase,
+        restoretext if self.context.move_phdrs_to_text else ''))
 
   def get_popgm_code(self):
     #pushad and popad do NOT exist in x64,
