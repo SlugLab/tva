@@ -254,7 +254,7 @@ class X64Runtime(object):
     '''
     return _asm(global_lookup_template%(self.context.global_sysinfo+8))
 
-  def get_auxvec_code(self,entry):
+  def get_auxvec_code(self,entry, block_start=None):
     #Example assembly for searching the auxiliary vector
     #TODO: this commented assembly needs to be updated, as it's still (mostly) 32-bit code
     '''
@@ -321,10 +321,9 @@ class X64Runtime(object):
 	ret
     '''
     auxvec_template = '''
+base:
   	mov [rsp-8],rsi
   	mov [rsp-16],rcx
-    lea rcx, [rip-17]
-    mov [rsp-24], rcx
   	mov rsi,[rsp]
   	mov rcx,rsp
   	lea rcx,[rcx+rsi*8+8]
@@ -344,21 +343,15 @@ class X64Runtime(object):
   	jmp loopaux
     foundsysinfo:
   	mov rsi,[rcx+8]
-  	mov [%s],rsi
+    lea rcx, [rip+base]
+    mov [rcx + %s],rsi
     restore:
-    mov rcx,[rsp-24]
-    add rcx, %s
-    mov [rsp-32], rcx
-    mov rcx,[rsp-24]
-    add rcx, %s
-    mov [rsp-24], rcx
   	mov rsi,[rsp-8]
   	mov rcx,[rsp-16]
-       call [rsp-24]
-    	add rsp,8
+        call base + %s
 	%s
-       add rsp,8
-       jmp [rsp-32]'''
+    jmp base + %s
+    '''
     restoretext = '''
 	push rax		
 	push rdi
@@ -389,11 +382,13 @@ class X64Runtime(object):
 	pop rax
     ''' % ( (self.context.oldbase//0x1000)*0x1000, self.context.global_lookup - 0x20000, self.context.oldbase, 0x1000-(self.context.oldbase%0x1000), (self.context.oldbase//0x1000)*0x1000 )
     print(f"popgm offset is {hex(self.context.popgm_offset)}")
+    if block_start == None:
+        block_start = self.context.new_entry_off + self.context.newbase
     return _asm(auxvec_template%(
-        self.context.global_sysinfo,
-        entry-self.context.new_entry_off,
-        self.context.global_lookup+self.context.popgm_offset - self.context.new_entry_off - self.context.newbase,
-        restoretext if self.context.move_phdrs_to_text else ''))
+        self.context.global_sysinfo-self.context.new_entry_off-self.context.newbase,
+        self.context.global_lookup+self.context.popgm_offset - block_start,
+        restoretext if self.context.move_phdrs_to_text else '',
+        entry-block_start+self.context.newbase))
 
   def get_popgm_code(self):
     #pushad and popad do NOT exist in x64,
@@ -402,6 +397,7 @@ class X64Runtime(object):
     #completely re-engineered, so we will need to change the offset to 0x11 
     #once we have fixed popgm for x64
     call_popgm = '''
+    base:
     push rax
     push rcx
     push rdx
@@ -409,7 +405,7 @@ class X64Runtime(object):
     push rbp
     push rsi
     push rdi
-    mov rdi, %s
+    lea rdi, [rip + base + %s]
     call $+0x0d
     pop rdi
     pop rsi
@@ -420,7 +416,7 @@ class X64Runtime(object):
     pop rax
     ret
     '''
-    popgmbytes = asm(call_popgm%(self.context.global_sysinfo+8))
+    popgmbytes = _asm(call_popgm%(self.context.global_sysinfo+8 - self.context.popgm_offset - 0x200000))
     with open('x64_%s' % self.context.popgm, "rb") as f:
       popgmbytes+=f.read()
     return popgmbytes
