@@ -154,6 +154,18 @@ class ELFManip(object):
 
     def relocate_phdrs(self, custom_offset=None, new_size=None, segment=None, use_methods=None):
         '''
+        toss phdrs after the end of the original file instead of the start
+        '''
+        m = os.stat(self.filename).st_size
+        c = len(list( self.elf.iter_segments()))
+
+        # Toss phdrs after the end of the original file
+        self._update_phdr_entry(m, c*100)
+        # phdr table needs to be in a loaded section
+        self.add_segment(CustomSegment(PT_LOAD, m, m, m, c*100,c*100, 4, 0x8, 'x64'))
+
+        return self.phdrs['base']
+        '''
         Attempts to find a new location for the program headers to reside in the ELF image.
         In theory, you should be able to place the program headers anywhere in the image. The
         loader has the requirement that it be placed in a PT_LOAD segment. However, in testing,
