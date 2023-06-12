@@ -136,7 +136,7 @@ class Rewriter(object):
           addr = section.header.sh_addr
           self.context.oldbase = addr
           # If .text section is large enough to hold all new segments, we can move the phdrs there
-          if size >= elffile.header['e_phentsize']*(elffile.header['e_phnum']+self.context.num_new_segments+1):
+          if False and size >= elffile.header['e_phentsize']*(elffile.header['e_phnum']+self.context.num_new_segments+1):
             self.context.move_phdrs_to_text = True
         if section.name == '.plt':
           self.context.plt['addr'] = section.header['sh_addr']

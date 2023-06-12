@@ -79,7 +79,7 @@ def rewrite(fname, nname, newcode, newbase, newglobal, newglobalbase, entry, tex
     # IF the text section is large enough to hold the phdrs (true for a nontrivial program)
     # AND the architecture is x86-64, because I have not written 32-bit code to restore the text section yet
     # TODO: add support to 32-bit rewriter to use .text section for phdrs
-    if arch == 'x86-64' and text_section_size >= elf.ehdr['e_phentsize']*(elf.ehdr['e_phnum']+num_new_segments):
+    if False and arch == 'x86-64' and text_section_size >= elf.ehdr['e_phentsize']*(elf.ehdr['e_phnum']+num_new_segments):
       # Place the phdrs at the start of the (original) text section, overwriting the contents
       print( 'placing phdrs in .text section, overwriting contents until runtime')
       #print( 'BUT for now, still do it the original way so we can do a quick test...')
