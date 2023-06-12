@@ -127,8 +127,8 @@ class X64Translator(Translator):
       #and only change the last 4 bytes (the offset), I should actually be able to support these incompatible
       #instructions by saving their original bytes in the assembler cache and therefore never actually sending
       #the disassembled instruction to the assembler at all.
-      incompatible = ['ljmp', 'fstp', 'fldenv', 'fld', 'fbld']
-      if 'rip' in ins.op_str:# and (ins.mnemonic not in incompatible):
+      incompatible = ['ljmp', 'fstp', 'fldenv', 'fld', 'fbld', 'vcomisd']
+      if 'rip' in ins.op_str and (ins.mnemonic not in incompatible):
         '''asm1 = asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping) ) )
         asm2 = asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,None) ) )
         if len(asm1) != len(asm2):
@@ -148,6 +148,7 @@ class X64Translator(Translator):
           print( 'NOT rewriting %s instruction with rip: %s %s' % (ins.mnemonic,ins.mnemonic,ins.op_str) )
         if ins.mnemonic == 'ljmp':
           print( 'WARNING: unhandled %s %s @ %x'%(ins.mnemonic,ins.op_str,ins.address))'''
+        print( 'WARNING: [%s] unhandled %s %s @ %x'%('incompatible' if ins.mnemonic in incompatible else 'compatible', ins.mnemonic,ins.op_str,ins.address))
         if inserted is not None:
           return inserted + str(ins.bytes)
       return None #No translation needs to be done
