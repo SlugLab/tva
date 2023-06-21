@@ -3,7 +3,9 @@ from x64_assembler import _asm,asm
 class X64Runtime(object):
   def __init__(self,context):
     self.context = context
-    self.context.global_lookup = 0x200000 # Set global lookup offset for 64-bit
+
+    # headers first then global lookup
+    self.context.global_lookup = context.o_max_alloc + 0x14000
 
   def get_lookup_code(self,base,size,lookup_off,mapping_off):
     #Example assembly for lookup function
@@ -416,7 +418,9 @@ base:
     pop rax
     ret
     '''
-    popgmbytes = _asm(call_popgm%(self.context.global_sysinfo+8 - self.context.popgm_offset - 0x200000))
+    offset = self.context.o_max_alloc + 0x4000 - (self.context.popgm_offset + self.context.global_lookup)
+    print(f"target popgm addr is: {hex(offset)}")
+    popgmbytes = _asm(call_popgm%(offset))
     with open('x64_%s' % self.context.popgm, "rb") as f:
       popgmbytes+=f.read()
     return popgmbytes

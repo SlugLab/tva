@@ -109,15 +109,35 @@ class Rewriter(object):
     #Now actually set the size of allocated space
     self.context.alloc_globals = size
     return retval
-  
-  #Find the earliest address we can place the new code
-  def find_newbase(self,elffile):
+
+  def find_max_alloc(self, elffile, arch):
     maxaddr = 0
+    # find max segment
     for seg in elffile.iter_segments():
       segend = seg.header['p_vaddr']+seg.header['p_memsz']
       if segend > maxaddr:
         maxaddr = segend
+      # and then check max symbol
+      try:
+          for sym in section.iter_symbols():
+              end_addr = sym.entry.st_value + sym.entry.st_size
+              max_alloc = max_alloc if max_alloc > end_addr else end_addr
+      except:
+          pass
     maxaddr += ( 0x1000 - maxaddr%0x1000 ) # Align to page boundary
+    self.context.o_max_alloc = maxaddr
+    print(f"max alloc found is: {hex(maxaddr)}")
+
+  #Find the earliest address we can place the new code
+  def find_newbase(self,elffile, arch):
+    maxaddr = self.context.o_max_alloc # start with max symbol
+    # put mapping bytes before text section, because it's length is more stable
+    mapper = BruteForceMapper(arch,b'',0,0,self.context)
+    maxaddr += len(mapper.runtime.get_global_mapping_bytes())
+
+    maxaddr += ( 0x1000 - maxaddr%0x1000 ) # Align to page boundary
+    maxaddr += 0x14000 # add a few pages to sneak the new headers in
+    print(f"new base is: {hex(maxaddr)}")
     return maxaddr
 
   def rewrite(self,fname,arch):
@@ -128,6 +148,7 @@ class Rewriter(object):
       relaplt = None
       dynsym = None
       entry = elffile.header.e_entry #application entry point
+      # TODO: have this find any segments marked as executables instead
       for section in elffile.iter_sections():
         if section.name == '.text':
           print("Found .text")
@@ -171,15 +192,14 @@ class Rewriter(object):
         #print self.context.plt
       else:
           print('binary does not contain plt')
+      self.find_max_alloc(elffile, arch)
+      self.context.newbase = self.find_newbase(elffile, arch)
       if self.context.write_so:
         print('Writing as .so file')
-        self.context.newbase = self.find_newbase(elffile)
       elif self.context.exec_only:
         print( 'Writing ONLY main binary, without support for rewritten .so files')
-        self.context.newbase = 0x09000000
       else:
         print( 'Writing as main binary')
-        self.context.newbase = 0x09000000
       if self.context.no_pic:
         print( 'Rewriting without support for generic PIC')
       for seg in elffile.iter_segments():
@@ -240,16 +260,21 @@ class Rewriter(object):
   	  #for ins in insts:
           #  print '0x%x:\t%s\t%s\t%s'%(ins.address,str(ins.bytes).encode('hex'),ins.mnemonic,ins.op_str)
           if not self.context.write_so:
-            print( 'new entry point: 0x%x'%(self.context.newbase + self.context.new_entry_off))
-            print( 'new _start point: 0x%x'%(self.context.newbase + mapping[entry]))
-            print( 'global lookup: 0x%x'%self.context.global_lookup)
+            new_ent =self.context.newbase + self.context.new_entry_off
+            new_start = self.context.newbase + mapping[entry]
+            print(f'new entry point: {hex(new_ent)}')
+            print(f'new _start point: {hex(new_start)}')
+            print(f'global lookup: 0x%x'%self.context.global_lookup)
           print( 'local lookup: 0x%x'%self.context.lookup_function_offset)
           print( 'secondary local lookup: 0x%x'%self.context.secondary_lookup_function_offset)
           print( 'mapping offset: 0x%x'%mapping[self.context.mapping_offset])
           with open('%s-r-map.json'%fname,'wt') as f:
             json.dump(mapping,f)
           if not self.context.write_so:
-            bin_write.rewrite(fname,fname+'-r','newbytes',self.context.newbase,mapper.runtime.get_global_mapping_bytes(),self.context.global_lookup,self.context.newbase+self.context.new_entry_off,offs,size,self.context.num_new_segments,arch)
+            bin_write.rewrite(fname, fname+'-r', 'newbytes',
+                    self.context.newbase, mapper.runtime.get_global_mapping_bytes(),
+                    self.context.global_lookup, new_ent,
+                    offs, size, self.context.num_new_segments, arch)
           else:
             self.context.new_entry_off = mapping[entry]
             bin_write.rewrite_noglobal(fname,fname+'-r','newbytes',self.context.newbase,self.context.newbase+self.context.new_entry_off)

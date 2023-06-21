@@ -156,13 +156,24 @@ class ELFManip(object):
         '''
         toss phdrs after the end of the original file instead of the start
         '''
-        m = os.stat(self.filename).st_size
+        fsz = os.stat(self.filename).st_size
+        # m = self.elf.get_section_by_name('.symtab').get_symbol_by_name('_end')[0].entry.st_value
+        m = fsz
+        for section in self.elf.iter_sections():
+            try:
+                for sym in section.iter_symbols():
+                    end_addr = sym.entry.st_value + sym.entry.st_size
+                    m = m if m > end_addr else end_addr
+            except:
+                continue
         c = len(list( self.elf.iter_segments()))
+        m = m + 0x1000 - (m%0x1000)# add a page so we don't intersect
+        m = m + (fsz%0x1000)
 
         # Toss phdrs after the end of the original file
-        self._update_phdr_entry(m, c*100)
+        self._update_phdr_entry(fsz, (c+6)*56, virt_addr = m)
         # phdr table needs to be in a loaded section
-        self.add_segment(CustomSegment(PT_LOAD, m, m, m, c*100,c*100, 4, 0x8, 'x64'))
+        self.add_segment(CustomSegment(PT_LOAD, fsz, m, m, (6+c)*56,(6+c)*56, 4, 0x8, 'x64'))
 
         return self.phdrs['base']
         '''
@@ -364,7 +375,7 @@ class ELFManip(object):
         self._update_phdr_entry(self.phdrs['base'], self.phdrs['size'] + freed_space)
         return True
 
-    def _update_phdr_entry(self, new_base, max_size, segment=None):
+    def _update_phdr_entry(self, new_base, max_size, segment=None, virt_addr=None):
         ''' Update the PHDR entry to match the new location of the program headers
             @param new_base: offset at which the program headers will be located
             @param max_size: maximum size in bytes that the new program headers can grow to
@@ -383,8 +394,8 @@ class ELFManip(object):
             if p.p_type == PT_PHDR:
                 logger.debug("Updating the PHDR segment to new offset: 0x%x", self.phdrs['base'])
                 p.p_offset = self.phdrs['base']
-                p.p_vaddr = self.image_base + p.p_offset
-                p.p_paddr = self.image_base + p.p_offset
+                p.p_vaddr = self.image_base + p.p_offset if virt_addr == None else virt_addr
+                p.p_paddr = self.image_base + p.p_offset if virt_addr == None else virt_addr
                 if self.arch == 'x64':
                     p.p_filesz = len(self.phdrs['entries']) * 56  # 56 bytes each for 64-bit
                 else:

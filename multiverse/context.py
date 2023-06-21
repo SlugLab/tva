@@ -3,6 +3,7 @@ class Context(object):
 
   def __init__(self):
     self.plt = {}
+    self.o_max_alloc = 0 # maximum symbol that exists in the original binary
     self.oldbase = 0x0
     self.newbase = 0x09000000
     self.lookup_function_offset = 0x8f
