@@ -216,8 +216,8 @@ class X64Runtime(object):
 	push rbx		
 	push rdx
 	push r10
-	mov rcx, %s		
-	mov rbx, [rcx]		
+	mov rcx, 0x56780000
+	mov rbx, [rcx]
 	xor rdx, rdx		
     searchloop:
 	cmp rbx, rdx		
@@ -245,16 +245,19 @@ class X64Runtime(object):
 	pop rdx
 	pop rbx
 	pop rcx	
+	test rbx, rbx
+	jz skip
     	mov [rsp-64],rax		
     	mov rax,[rsp+8]	
     	call glookup		
     	mov [rsp+8],rax	
     	mov rax,[rsp-64]		
+	skip:
   	ret
     failure:
 	hlt
     '''
-    return _asm(global_lookup_template%(self.context.global_sysinfo+8))
+    return _asm(global_lookup_template)
 
   def get_auxvec_code(self,entry, block_start=None):
     #Example assembly for searching the auxiliary vector
@@ -345,8 +348,7 @@ base:
   	jmp loopaux
     foundsysinfo:
   	mov rsi,[rcx+8]
-    lea rcx, [rip+base]
-    mov [rcx + %s],rsi
+	mov [rip + base + %s], rsi
     restore:
   	mov rsi,[rsp-8]
   	mov rcx,[rsp-16]
@@ -365,8 +367,8 @@ base:
 	mov rdx, 7		
 	syscall			
 	mov rax, 0		
-	mov rsi, %s
-	mov rdi, %s	
+	lea rsi, [rip + base + %s]
+	lea rdi, [rip + base + %s]
     looprestore:
 	mov rdx, [rsi+rax]	
 	mov [rdi+rax], rdx	
@@ -382,15 +384,18 @@ base:
 	pop rsi
 	pop rdi
 	pop rax
-    ''' % ( (self.context.oldbase//0x1000)*0x1000, self.context.global_lookup - 0x20000, self.context.oldbase, 0x1000-(self.context.oldbase%0x1000), (self.context.oldbase//0x1000)*0x1000 )
+    ''' % ( (self.context.oldbase//0x1000)*0x1000,
+            self.context.global_lookup - 0x20000 - block_start,
+            self.context.oldbase - block_start,
+            0x1000-(self.context.oldbase%0x1000),
+            (self.context.oldbase//0x1000)*0x1000 )
     print(f"popgm offset is {hex(self.context.popgm_offset)}")
-    if block_start == None:
-        block_start = self.context.new_entry_off + self.context.newbase
     return _asm(auxvec_template%(
-        self.context.global_sysinfo-self.context.new_entry_off-self.context.newbase,
-        self.context.global_lookup+self.context.popgm_offset - block_start,
+        self.context.global_sysinfo - block_start,
+        self.context.global_lookup - block_start + self.context.popgm_offset,
         restoretext if self.context.move_phdrs_to_text else '',
-        entry-block_start+self.context.newbase))
+        entry + self.context.newbase - block_start
+      ))
 
   def get_popgm_code(self):
     #pushad and popad do NOT exist in x64,

@@ -16,16 +16,35 @@
  * 		 		- can happen in rare(?) cases... the file is not a "normal file"
  *
  */
+// Use definitions from here
+#include <sys/mman.h>
+#include <signal.h>
+#include <string.h>
+
 #ifdef DEBUG
 #include <stdio.h>
-#include <sys/mman.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#else
-#define NULL ( (void *) 0)
 #endif
+
+#define GM_LOC (void*)0x000056780000
+#define PAGE_SIZE 0x1000
+
+/* This is the sigaction structure from the Linux 3.2 kernel.  */
+struct kernel_sigaction
+{
+        __sighandler_t k_sa_handler;
+        unsigned long sa_flags;
+        // This was optional, not sure if it's supposed to be here.
+        // Probably is, since sa_mask has an offset of 0x18 and not 0x10
+        void (*sa_restorer) (void);
+        /* glibc sigset is larger than kernel expected one, however sigaction
+        *      passes the kernel expected size on rt_sigaction syscall.  */
+        sigset_t sa_mask;
+};
+
 
 struct gm_entry {
 	unsigned long lookup_function;
@@ -35,15 +54,54 @@ struct gm_entry {
 
 unsigned int __attribute__ ((noinline)) my_read(int, char *, unsigned int);
 int __attribute__ ((noinline)) my_open(const char *);
-void populate_mapping(unsigned int, unsigned long, unsigned long, unsigned long, struct gm_entry *);
+void populate_mapping(unsigned int, unsigned long, unsigned long, unsigned long, volatile struct gm_entry *);
 void process_maps(char *, struct gm_entry *);
 struct gm_entry lookup(unsigned long, struct gm_entry *);
+int make_mapping(struct gm_entry *global_mapping);
+void segv_handle(int signal);
 
 #ifdef DEBUG
-int wrapper(struct gm_entry *global_mapping){
+int wrapper(void* glookup){
 #else
-int _start(struct gm_entry *global_mapping){
+int _start(void * glookup){
 #endif
+	struct gm_entry* global_mapping = mmap(
+			GM_LOC,
+			4 * PAGE_SIZE,
+			PROT_READ | PROT_WRITE,
+			MAP_PRIVATE | MAP_ANONYMOUS,
+			-1,
+			0);
+	// Only the main exec has the global lookup code
+	// so the shared lobraries need a reference to it.
+        struct sigaction sa;
+	sa.sa_handler = segv_handle;
+	sa.sa_flags = 0;
+
+	sigaction(SIGSEGV, &sa, 0);
+	int rc = make_mapping(global_mapping);
+	global_mapping[0].start = (unsigned long)glookup;
+	return rc;
+}
+
+__attribute__ ((naked))
+void segv_handle(int signal){
+        asm volatile(
+                ".intel_syntax noprefix\n"
+                "mov rax, [rsp+ 0xb0]\n" // load current return addr
+                "mov rbx, 1\n" // figure out how to tell it not to recurse
+		"call [0x56780008]\n" // mapper addr
+		// TODO: check for successful mapping
+		"mov [rsp+ 0xb0], rax\n" // load mapped addr
+		"ret\n"
+		:
+		:
+		: "rbx", "rax"
+        ); // */
+}
+
+
+int make_mapping(struct gm_entry *global_mapping){
 	// force string to be stored on the stack even with optimizations
 	//char maps_path[] = "/proc/self/maps\0";
 	volatile int maps_path[] = {
@@ -139,6 +197,111 @@ unsigned int __attribute__ ((noinline)) my_read(int fd, char *buf, unsigned int 
 	);
 	return (unsigned int) bytes_read;
 }
+
+__attribute__ ((naked))
+__attribute__ ((noinline))
+void __restore_rt(){
+        asm volatile(
+                ".intel_syntax noprefix\n"
+                "mov rax, 0xf\n"
+                "syscall\n"
+                "jmp %0\n"
+                :
+                : "g" (sigaction)
+                : "r10", "rdi", "rsi", "rdx", "rax"
+        );
+
+}
+
+__attribute__ ((noinline))
+int __attribute__ ((noinline)) sigaction(int n, const struct sigaction *__restrict act, struct sigaction *__restrict oact)
+{
+        volatile struct kernel_sigaction kact, koact;
+
+        if (act)
+        {
+                kact.k_sa_handler = act->sa_handler;
+                memcpy ((void*)&kact.sa_mask, &act->sa_mask, sizeof (sigset_t));
+
+                // Not sure why, but this makes the assembnly match and gets rid of _a_ segfault
+                kact.sa_flags = act->sa_flags | 0x4000000;
+                kact.sa_restorer = __restore_rt +4;
+        }
+        long ret_addr;
+        asm volatile(
+                ".intel_syntax noprefix\n"
+                "mov rax, 13\n"
+                "mov rdi, %1\n"
+                "mov rsi, %2\n"
+                "mov rdx, %3\n"
+                "mov r10, 8\n"
+                "syscall\n"
+                "mov %0, rax\n"
+                : "=r" (ret_addr)
+                : "g" ((long)n), "g" (&kact), "g" (&koact)
+                : "rcx", "r10", "rdi", "rsi", "rdx", "rax"
+        );
+
+        if (oact)
+        {
+                oact->sa_handler = koact.k_sa_handler;
+                memcpy (&oact->sa_mask, (void*)&koact.sa_mask, sizeof (sigset_t));
+
+                oact->sa_flags = koact.sa_flags;
+        }
+        return (int) ret_addr;
+}
+
+__attribute__ ((naked))
+__attribute__ ((noinline))
+int __attribute__ ((noinline)) write(int fd, const void *buf, size_t len)
+{
+        long ret_addr;
+        asm volatile(
+                ".intel_syntax noprefix\n"
+                "mov rax, 1\n"
+                "mov r10, rcx\n"
+                "syscall\n"
+                "mov %0, rax\n"
+                "ret\n"
+                : "=r" (ret_addr)
+                :
+                : "r11", "rdi", "rsi", "rdx", "r8", "r9"
+        );
+}
+
+#ifndef DEBUG
+void* __attribute__ ((noinline)) mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset){
+	void* ret_addr;
+	asm volatile(
+		".intel_syntax noprefix\n"
+		"mov rax, 9\n"
+		"mov r10, rcx\n"
+		"syscall\n"
+		"mov %0, rax\n"
+		: "=r" (ret_addr)
+		:
+		: "r11", "rdi", "rsi", "rdx", "r8", "r9"
+	);
+	return ret_addr;
+}
+
+__attribute__ ((naked))
+__attribute__ ((noinline))
+int mprotect(void *addr, size_t len, int prot){
+	asm volatile(
+		".intel_syntax noprefix\n"
+		"mov rax, 10\n"
+		"mov r10, rcx\n"
+		"syscall\n"
+		"ret\n"
+		:
+		:
+		: "r11", "rdi", "rsi", "rdx", "r8", "r9"
+	);
+}
+
+#endif
 
 int __attribute__ ((noinline)) my_open(const char *path){
 	unsigned long fp;
@@ -268,7 +431,7 @@ void parse_range(char *line, unsigned long *start, unsigned long *end){
 	*end   = my_atol(line+1);
 }
 
-void populate_mapping(unsigned int gm_index, unsigned long start, unsigned long end, unsigned long lookup_function, struct gm_entry *global_mapping){
+void populate_mapping(unsigned int gm_index, unsigned long start, unsigned long end, unsigned long lookup_function, volatile struct gm_entry *global_mapping){
 	global_mapping[gm_index].lookup_function = lookup_function;
 	global_mapping[gm_index].start = start;
 	global_mapping[gm_index].length = end - start;
@@ -283,7 +446,7 @@ void process_maps(char *buf, struct gm_entry *global_mapping){
 	 * populate global_mapping for each executable set of pages
 	 */
 	char *line = buf;
-	unsigned int gm_index = 1;//Reserve first entry for metadata
+	unsigned int gm_index = 0;
 	unsigned char permissions = 0;
 	//unsigned int global_start, global_end;
 	unsigned long old_text_start, old_text_end = 0;
@@ -297,7 +460,11 @@ void process_maps(char *buf, struct gm_entry *global_mapping){
 		// process all segments from this object under very specific assumptions
 		if ( is_exec(permissions) ){
 			if( !is_write(permissions) ){
+				// one index because first entry is metadata
+				gm_index++;
 				parse_range(line, &old_text_start, &old_text_end);
+				// prefill slot so we crash on incorrect processing
+				populate_mapping(gm_index, old_text_start, old_text_end, 0x00000001, global_mapping);
 #ifdef DEBUG
 				printf("Parsed range for r-xp: %lx-%lx\n", old_text_start, old_text_end);
 #endif
@@ -308,15 +475,18 @@ void process_maps(char *buf, struct gm_entry *global_mapping){
 					// Populate external regions with 0x00000000, which will be checked for in the global lookup.
 					// It will then rewrite the return address on the stack and return the original address.
 					populate_mapping(gm_index, old_text_start, old_text_end, 0x00000000, global_mapping);
-					gm_index++;
+				}
+				else{
+					// internal things become read only
+					mprotect((void*)old_text_start, old_text_end-old_text_start, PROT_READ);
 				}
 			}else{
 				parse_range(line, &new_text_start, &new_text_end);
 #ifdef DEBUG
 				printf("Parsed range for rwxp: %lx-%lx\n", new_text_start, new_text_end);
 #endif
-				populate_mapping(gm_index, old_text_start, old_text_end, new_text_start, global_mapping);
-				gm_index++;
+				// mapping covers until the end of the new code region so that mapped addresses are handled
+				populate_mapping(gm_index, old_text_start, new_text_end, new_text_start, global_mapping);
 			}
 		}
 		line = next_line(line);
