@@ -36,10 +36,11 @@ class X64Runtime(object):
     '''
     #TODO: support lookup for binary/library combination
     lookup_template = '''
+    lookup:
   	push rbx
   	mov rbx,rax
-  	lea rax, [rip-%s]
-    	%s
+       lea rax, [rip - %s + lookup]
+       %s
   	jb outside
   	cmp rbx,%s
   	jae outside
@@ -52,9 +53,10 @@ class X64Runtime(object):
     outside:
   	%s
   	mov rax,rbx
-  	pop rbx
-  	mov QWORD PTR [rsp-8],%s
-    	jmp [rsp-8]
+    mov rbx, [0x56780008]
+    xchg rbx, [rsp]
+    add rsp, 8
+    jmp [rsp-8]
     failure:
   	hlt
     '''
@@ -108,13 +110,16 @@ class X64Runtime(object):
 	add rbx, rax
 	sub rbx, %s
     '''
-    #retrieve rip 11 bytes after start of lookup function (right after first lea instruction)
-    if self.context.write_so:
-      return _asm(lookup_template%(lookup_off+11,so_code%(self.context.newbase),size,mapping_off,so_restore%(self.context.newbase),self.context.global_lookup))
-    elif self.context.exec_only:
+    if self.context.exec_only:
       return _asm( exec_only_lookup%(lookup_off+11,base,size,mapping_off,base) )
     else:
-      return _asm(lookup_template%(lookup_off+11,exec_code%base,size,mapping_off,exec_restore%base,self.context.global_lookup))
+      return _asm(lookup_template%(
+          lookup_off,
+          so_code%(self.context.newbase - base),
+          size,
+          mapping_off,
+          so_restore%(self.context.newbase - base)
+        ))
 
   def get_secondary_lookup_code(self,base,size,sec_lookup_off,mapping_off):
     '''This secondary lookup is only used when rewriting only the main executable.  It is a second, simpler
