@@ -36,9 +36,19 @@ runcpu --action build --config=$SPEC/config/$CONFIG ${TEST_ID}.${TEST_NAME}
 instrument(){
 pushd $MULTIVERSE
 # Instrument
-echo ./multiverse.py --arch $ARCH $BINARY --execonly
-./multiverse.py --arch $ARCH $BINARY --execonly
+if [ "${PRO_FILE}" != "" ]
+then
+	PROFILE ="python3 -m cProfile -o $PRO_FILE "
+fi
+echo ./multiverse.py --arch $ARCH $BINARY
+$PROFILE ./multiverse.py --arch $ARCH $BINARY
 #> last_run.out 2>last_run.err
+if [ $? != 0 ]
+then
+	popd
+	echo "Instrumentation Failed"
+	return
+fi
 cp $BINARY $BINARY-orig
 mv ${BINARY}-r $BINARY
 popd
@@ -69,3 +79,5 @@ BINARY=$SPEC/benchspec/CPU/${TEST_ID}.${TEST_NAME}/exe/${TEST_PREFIX}${TEST_NAME
 #run
 $1
 
+#ding when we finish
+echo $'\a'

@@ -1,0 +1,3 @@
+export TEST_ID=500
+export TEST_NAME=perlbench_r
+export TEST_PREFIX="./"

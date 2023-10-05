@@ -1,0 +1,3 @@
+export TEST_ID=525
+export TEST_NAME=x264_r
+export TEST_PREFIX="./"
