@@ -265,6 +265,9 @@ class X64Runtime(object):
     return _asm(global_lookup_template)
 
   def get_auxvec_code(self,entry, block_start=None):
+    if block_start == None:
+        block_start = self.context.new_entry_off + self.context.newbase
+    print(f"get auxvec code with entry='{hex(entry)}' and block_start='{hex(block_start)}'")
     #Example assembly for searching the auxiliary vector
     #TODO: this commented assembly needs to be updated, as it's still (mostly) 32-bit code
     '''
