@@ -1,4 +1,4 @@
-from x64_assembler import asm,cache,metacache
+from x64_assembler import _asm, asm,cache,metacache
 from capstone.x86 import X86_OP_REG,X86_OP_MEM,X86_OP_IMM
 import struct
 import re
@@ -97,7 +97,7 @@ class X64Translator(Translator):
           return newopstr
 
   def translate_one(self,ins,mapping):
-    if ins.mnemonic in ['call','jmp']: #Unconditional jump
+    if ins.mnemonic in ['call','jmp','bnd jmp']: #Unconditional jump
       return self.translate_uncond(ins,mapping)
     elif ins.mnemonic in self.JCC: #Conditional jump
       return self.translate_cond(ins,mapping)
@@ -270,22 +270,15 @@ class X64Translator(Translator):
           self.context.stat['dirjmp']+=1
       elif ins.mnemonic == 'call': #If it's a call, push the original address of the next instruction
         self.context.stat['dircall']+=1
-        exec_call = '''
-        push %s
-        '''
-        so_call = '''
+        any_call = '''
+        base:
         push rbx
-        lea rbx,[rip - 0x%x]
-        xchg rbx,[rsp]
+        lea rbx, [rip + base + %s]
+        xchg rbx, [rsp]
         '''
-        if self.context.write_so:
-          if mapping is not None:
-            # 8 is the length of push rbx;lea rbx,[rip-%s]
-            code += asm(so_call%( (self.context.newbase+(mapping[ins.address]+8)) - (ins.address+len(ins.bytes)) ) )
-          else:
-            code += asm(so_call%( (self.context.newbase) - (ins.address+len(ins.bytes)) ) )
-        else:
-          code += asm(exec_call%(ins.address+len(ins.bytes)))
+        orig_addr = (ins.address + len(ins.bytes))
+        start_of_block = (len(code) + self.context.newbase + (mapping[ins.address] if mapping is not None else 0))
+        code += _asm(any_call%(orig_addr - start_of_block))
       else:
         self.context.stat['dirjmp']+=1
       newtarget = self.remap_target(ins.address,mapping,target,len(code))
@@ -319,24 +312,23 @@ class X64Translator(Translator):
     #addressing is destroyed because all the offsets are completely different; we need the 
     #original address that rip WOULD have pointed to, so we must replace any references to it.
     template_before = '''
+    base:
     mov [rsp-64], rax
+    mov [rsp-72], rbx
     mov rax, %s
+    mov rbx, %s
     %s
     '''
-    exec_call = '''
-    push %s
-    '''
-    so_call_before = '''
+    rip_rel_call = '''
     push rbx
-    '''
-    so_call_after = '''
-    lea rbx,[rip - 0x%x]
+    lea rbx,[rip + base - 0x%x]
     xchg rbx,[rsp]
     '''
     template_after = '''
     call $+%s
     mov [rsp-8], rax
     mov rax, [rsp-%s]
+    mov rbx, [rsp-%s]
     jmp [rsp-8]
     '''
     template_nopic = '''
@@ -363,27 +355,23 @@ class X64Translator(Translator):
         oldone = len( asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,None) ) ) )
         print( '%d vs %d, %s' % (newone,oldone,newone == oldone))'''
       # The new "instruction length" is the length of all preceding code, plus the instructions up through the one referencing rip
-      target = self.replace_rip(ins,mapping,len(code) + len(asm('mov [rsp-64],rax\nmov rax,[rip]')) )
+      target = self.replace_rip(ins,mapping,len(code) + len(asm('mov [rsp-64],rax\nmov [rsp-72], rbx\nmov rax,[rip]')) )
     if self.context.no_pic:
       if ins.mnemonic == 'call':
         self.context.stat['indcall']+=1
       else:
         self.context.stat['indjmp']+=1
-      code += asm( template_before%(target,'') )
+      code += asm( template_before%(target, 1 if ins.mnemonic == call else 0,'') )
     elif ins.mnemonic == 'call':
       self.context.stat['indcall']+=1
-      if self.context.write_so:
-        code += asm( template_before%(target,so_call_before) )
-        if mapping is not None:
-          # 7 is the length of the lea rbx,[rip-%s] instruction, which needs to be added to the length of the code preceding where we access RIP
-          code += asm(so_call_after%( (mapping[ins.address]+len(code)+7+self.context.newbase) - (ins.address+len(ins.bytes)) ) )
-        else:
-          code += asm(so_call_after%( (0x8f+self.context.newbase) - (ins.address+len(ins.bytes)) ) )
-      else:
-        code += asm(template_before%(target,exec_call%(ins.address+len(ins.bytes)) ))
+      mapped_addr = 0x8f if mapping is None else mapping[ins.address] + len(code)
+      start_of_block = mapped_addr + self.context.newbase
+      ins_offset = (ins.address+len(ins.bytes))
+      ins_addr_off_from_block = start_of_block - ins_offset
+      code += _asm( template_before%(target,1,rip_rel_call%(ins_addr_off_from_block)) )
     else:
       self.context.stat['indjmp']+=1
-      code += asm(template_before%(target,''))
+      code += asm(template_before%(target, 0,''))
     size = len(code)
     lookup_target = self.remap_target(ins.address,mapping,self.context.lookup_function_offset,size)
     #Always transform an unconditional control transfer to a jmp, but
@@ -398,9 +386,9 @@ class X64Translator(Translator):
       lookup_target = self.remap_target(ins.address,mapping,self.context.secondary_lookup_function_offset,size)
       code += asm( template_nopic%(lookup_target,64,ins.mnemonic) )
     elif ins.mnemonic == 'call':
-      code += asm(template_after%(lookup_target,56))
+      code += asm(template_after%(lookup_target,56, 56+8))
     else:  
-      code += asm(template_after%(lookup_target,64))
+      code += asm(template_after%(lookup_target,64, 64+8))
     return code
   
   def get_remap_callbacks_code(self,ins,mapping,target):
