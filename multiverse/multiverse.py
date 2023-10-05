@@ -239,16 +239,13 @@ class Rewriter(object):
           if not self.context.write_so:
             with open('newglobal','wb') as f2:
               f2.write(mapper.runtime.get_global_mapping_bytes())
-          #print output
-          print( mapping[base])
+          print(mapping[base])
           maptext = mapper.write_mapping(mapping,base,len(bytes))
           cache = ''
           for x in maptext:
             cache+=f'{x},'
-          #print cache
-  	  #print maptext.encode('hex')
-          print( '0x%x'%(base+len(bytes)))
-          print( 'code increase: %d%%'%(((len(newbytes)-len(bytes))/float(len(bytes)))*100))
+          print('0x%x'%(base+len(bytes)))
+          print('code increase: %d%%'%(((len(newbytes)-len(bytes))/float(len(bytes)))*100))
           lookup = mapper.runtime.get_lookup_code(base,len(bytes),self.context.lookup_function_offset,0x8f)
           print( 'lookup w/unknown mapping %s'%len(lookup))
           #insts = md.disasm(lookup,0x0)
@@ -257,8 +254,6 @@ class Rewriter(object):
           lookup = mapper.runtime.get_lookup_code(base,len(bytes),self.context.lookup_function_offset,mapping[self.context.mapping_offset])
           print( 'lookup w/known mapping %s'%len(lookup))
           #insts = md.disasm(lookup,0x0)
-  	  #for ins in insts:
-          #  print '0x%x:\t%s\t%s\t%s'%(ins.address,str(ins.bytes).encode('hex'),ins.mnemonic,ins.op_str)
           if not self.context.write_so:
             new_ent =self.context.newbase + self.context.new_entry_off
             new_start = self.context.newbase + mapping[entry]
@@ -283,8 +278,7 @@ class Rewriter(object):
           self.context.stat['origfile'] = os.path.getsize(fname)
           self.context.stat['newfile'] = os.path.getsize(fname+'-r')
           self.context.stat['mapsize'] = len(maptext)
-          self.context.stat['lookupsize'] = \
-            len(mapper.runtime.get_lookup_code(base,len(bytes),self.context.lookup_function_offset,mapping[self.context.mapping_offset]))
+          self.context.stat['lookupsize'] = len(lookup)
           if self.context.exec_only:
             self.context.stat['secondarylookupsize'] = \
               len(mapper.runtime.get_secondary_lookup_code(base,len(bytes), \
