@@ -431,7 +431,7 @@ base:
     pop rax
     ret
     '''
-    offset = self.context.o_max_alloc + 0x4000 - (self.context.popgm_offset + self.context.global_lookup)
+    offset = self.context.o_max_alloc + 0x14000 - (self.context.popgm_offset + self.context.global_lookup)
     print(f"target popgm addr is: {hex(offset)}")
     popgmbytes = _asm(call_popgm%(offset))
     with open('x64_%s' % self.context.popgm, "rb") as f:
