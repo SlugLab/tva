@@ -89,7 +89,7 @@ void segv_handle(int signal){
         asm volatile(
                 ".intel_syntax noprefix\n"
                 "mov rax, [rsp+ 0xb0]\n" // load current return addr
-                "mov rbx, 1\n" // figure out how to tell it not to recurse
+                "mov rbx, 0\n" // figure out how to tell it not to recurse
 		"call [0x56780008]\n" // mapper addr
 		// TODO: check for successful mapping
 		"mov [rsp+ 0xb0], rax\n" // load mapped addr
