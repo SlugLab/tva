@@ -56,7 +56,7 @@ def get_tls_content(elf):
 
 def rewrite_noglobal(fname,nname,newcode,newbase,entry):
   elf = ELFManip(fname,num_adtl_segments=1)
-  with open(newcode, "wb") as f:
+  with open(newcode, "rb") as f:
     newbytes = f.read()
     elf.relocate_phdrs()
     newtext_section = CustomSection(newbytes, sh_addr = newbase)
