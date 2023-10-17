@@ -164,9 +164,12 @@ class X64Translator(Translator):
     template_before = '''
     mov [rsp-56], rax
     pop rax
+    push rbx
+    mov rbx, 0
     '''
     template_after = '''
     call $+%s
+    pop rbx
     %s
     mov [rsp-8], rax
     mov rax, [rsp-%d]
