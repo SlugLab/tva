@@ -1,0 +1,3 @@
+export SPEC=/opt/bwzhao/cpu2017
+export MULTIVERSE=/opt/bwzhao/multiverse/multiverse
+export PYTHONPATH="/opt/bwzhao/python/:$PYTHONPATH"

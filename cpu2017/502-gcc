@@ -1,0 +1,3 @@
+export TEST_ID=502
+export TEST_NAME=gcc_r
+export TEST_PREFIX="cpu"

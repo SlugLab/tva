@@ -1,0 +1,3 @@
+export TEST_ID=541
+export TEST_NAME=leela_r
+export TEST_PREFIX="./"

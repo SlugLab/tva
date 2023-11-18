@@ -1,0 +1,4 @@
+export TEST_ID=523
+export TEST_NAME=xalancbmk_r
+export TEST_BINARY=cpuxalan_r
+export TEST_PREFIX="./"

@@ -13,8 +13,11 @@ use_default "ARCH" "x86-64"
 use_default "TEST_ID" "502"
 use_default "TEST_PREFIX" "cpu"
 use_default "TEST_NAME" "gcc_r"
+use_default "TEST_BINARY" "$TEST_NAME"
 use_default "CONFIG" "bwzhao-multiverse"
 use_default "TEST_BASE" "bwzhao1-m64"
+use_default "TEST_COUNT" "3"
+use_default "TEST_COPIES" "4"
 
 
 echo ===========================================
@@ -28,33 +31,25 @@ popd
 
 echo $SPEC
 
+buildall(){
+# build all benchmarks
+runcpu --action build --config=$SPEC/config/$CONFIG intrate
+}
+
+runall(){
+# run all benchmarks
+echo runcpu --nobuild --config=$SPEC/config/$CONFIG intrate
+runcpu --nobuild --config=$SPEC/config/$CONFIG intrate
+}
+
 build(){
 # build the benchmark
 runcpu --action build --config=$SPEC/config/$CONFIG ${TEST_ID}.${TEST_NAME}
 }
 
-instrument(){
-pushd $MULTIVERSE
-# Instrument
-if [ "${PRO_FILE}" != "" ]
-then
-	PROFILE ="python3 -m cProfile -o $PRO_FILE "
-fi
-echo ./multiverse.py --arch $ARCH $BINARY
-$PROFILE ./multiverse.py --arch $ARCH $BINARY
-#> last_run.out 2>last_run.err
-if [ $? != 0 ]
-then
-	popd
-	echo "Instrumentation Failed"
-	return
-fi
-cp $BINARY $BINARY-orig
-mv ${BINARY}-r $BINARY
-popd
-}
-
+# instrument with push pop instrumentation
 i(){
+BINARY=$SPEC/benchspec/CPU/${TEST_ID}.${TEST_NAME}/exe/${TEST_PREFIX}${TEST_BINARY}_base.${TEST_BASE}
 echo i
 cmd="./addpp.py $BINARY"
 pushd $MULTIVERSE
@@ -65,18 +60,18 @@ popd
 
 run(){
 # run the benchmark
-echo runcpu --nobuild --config=$SPEC/config/$CONFIG ${TEST_ID}.$TEST_NAME -n 4
-runcpu --nobuild --config=$SPEC/config/$CONFIG ${TEST_ID}.$TEST_NAME -n 4
+echo runcpu --nobuild --config=$SPEC/config/$CONFIG ${TEST_ID}.$TEST_NAME -n $TEST_COUNT --copies $TEST_COPIES
+runcpu --nobuild --config=$SPEC/config/$CONFIG ${TEST_ID}.$TEST_NAME -n $TEST_COUNT --copies $TEST_COPIES
 }
 
-#BINARY=$SPEC/benchspec/CPU/${TEST_ID}.${TEST_NAME}/build/build_base_${TEST_BASE}.0000/${TEST_NAME}
-#BINARY=$SPEC/benchspec/CPU/${TEST_ID}.${TEST_NAME}/run/run_base_refrate_${TEST_BASE}.0000/${TEST_NAME}_base.${TEST_BASE}
-BINARY=$SPEC/benchspec/CPU/${TEST_ID}.${TEST_NAME}/exe/${TEST_PREFIX}${TEST_NAME}_base.${TEST_BASE}
+rwb(){
+#run with build
+echo runcpu --rebuild --config=$SPEC/config/$CONFIG ${TEST_ID}.$TEST_NAME -n $TEST_COUNT --copies $TEST_COPIES
+runcpu --rebuild --config=$SPEC/config/$CONFIG ${TEST_ID}.$TEST_NAME -n $TEST_COUNT --copies $TEST_COPIES
+}
 
-#build
-#instrument
-#i
-#run
+
+# just run the first arg passed in
 $1
 
 #ding when we finish

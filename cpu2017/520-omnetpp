@@ -1,0 +1,3 @@
+export TEST_ID=520
+export TEST_NAME=omnetpp_r
+export TEST_PREFIX="./"
