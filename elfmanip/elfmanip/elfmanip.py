@@ -157,23 +157,19 @@ class ELFManip(object):
         toss phdrs after the end of the original file instead of the start
         '''
         fsz = os.stat(self.filename).st_size
+        fsz = fsz + 0x1000 - (fsz % 0x1000)
         # m = self.elf.get_section_by_name('.symtab').get_symbol_by_name('_end')[0].entry.st_value
-        m = fsz
-        for section in self.elf.iter_sections():
-            try:
-                for sym in section.iter_symbols():
-                    end_addr = sym.entry.st_value + sym.entry.st_size
-                    m = m if m > end_addr else end_addr
-            except:
-                continue
-        c = len(list( self.elf.iter_segments()))
+        m = 0
+        for seg in self.elf.iter_segments():
+            end_addr = seg.header['p_vaddr']+seg.header['p_memsz']
+            m = m if m > end_addr else end_addr
+        c = len(list( self.elf.iter_segments())) + 6
         m = m + 0x1000 - (m%0x1000)# add a page so we don't intersect
-        m = m + (fsz%0x1000)
 
         # Toss phdrs after the end of the original file
-        self._update_phdr_entry(fsz, (c+6)*56, virt_addr = m)
+        self._update_phdr_entry(fsz, c * 56, virt_addr = m)
         # phdr table needs to be in a loaded section
-        self.add_segment(CustomSegment(PT_LOAD, fsz, m, m, (6+c)*56,(6+c)*56, 4, 0x8, 'x64'))
+        self.add_segment(CustomSegment(PT_LOAD, fsz, m, m, c * 56, c * 56, 4, 0x8, 'x64'))
 
         return self.phdrs['base']
         '''

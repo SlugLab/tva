@@ -127,7 +127,7 @@ class X64Translator(Translator):
       #and only change the last 4 bytes (the offset), I should actually be able to support these incompatible
       #instructions by saving their original bytes in the assembler cache and therefore never actually sending
       #the disassembled instruction to the assembler at all.
-      incompatible = ['vcomisd']
+      incompatible = ['vcomisd', 'comisd']
       if 'rip' in ins.op_str and (ins.mnemonic not in incompatible):
         '''asm1 = asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,mapping) ) )
         asm2 = asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,None) ) )
@@ -324,7 +324,7 @@ class X64Translator(Translator):
     '''
     rip_rel_call = '''
     push rbx
-    lea rbx,[rip + base - 0x%x]
+    lea rbx,[rip + base - %s]
     xchg rbx,[rsp]
     '''
     template_after = '''
@@ -371,7 +371,7 @@ class X64Translator(Translator):
       start_of_block = mapped_addr + self.context.newbase
       ins_offset = (ins.address+len(ins.bytes))
       ins_addr_off_from_block = start_of_block - ins_offset
-      code += _asm( template_before%(target,1,rip_rel_call%(ins_addr_off_from_block)) )
+      code += _asm( template_before%(target,1,rip_rel_call%(hex(ins_addr_off_from_block))) )
     else:
       self.context.stat['indjmp']+=1
       code += asm(template_before%(target, 0,''))
@@ -456,6 +456,9 @@ class X64Translator(Translator):
   def remap_target(self,addr,mapping,target,offs): #Only works for statically identifiable targets
     newtarget = '0x8f'
     if mapping is not None and target in mapping:#Second pass, known mapping
+      if addr not in mapping:
+          print(f"{addr} ({hex(addr)}) not in mapping")
+          return newtarget
       newtarget = mapping[target]-(mapping[addr]+offs) #Offset from curr location in mapping
       newtarget = hex(newtarget)
       #print( "original target: %s"%hex(target))
