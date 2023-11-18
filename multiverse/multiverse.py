@@ -11,6 +11,7 @@ import re
 
 from context import Context
 from brute_force_mapper import BruteForceMapper
+from tva_mapper import TVAMapper
 
 save_reg_template = '''
 mov DWORD PTR [esp%s], %s
@@ -81,11 +82,12 @@ callbacks = {'__libc_start_main':[0,3,4]}'''
 
 class Rewriter(object):
 
-  def __init__(self,write_so,exec_only,no_pic):
+  def __init__(self,write_so,exec_only,no_pic, tva=False):
     self.context = Context()
     self.context.write_so = write_so
     self.context.exec_only = exec_only
     self.context.no_pic = no_pic
+    self.tva = tva
 
   def set_before_inst_callback(self,func):
     '''Pass a function that will be called when translating each instruction.
@@ -104,7 +106,7 @@ class Rewriter(object):
     '''
     #create a temporary mapper to get where the globals would be inserted
     self.context.alloc_globals = 0
-    mapper = BruteForceMapper(arch,b'',0,0,self.context)
+    mapper = TVAMapper(arch,b'',0,0,self.context) if self.tva else BruteForceMapper(arch,b'',0,0,self.context)
     retval = self.context.global_lookup + len(mapper.runtime.get_global_mapping_bytes())
     #Now actually set the size of allocated space
     self.context.alloc_globals = size
@@ -132,7 +134,7 @@ class Rewriter(object):
   def find_newbase(self,elffile, arch):
     maxaddr = self.context.o_max_alloc # start with max symbol
     # put mapping bytes before text section, because it's length is more stable
-    mapper = BruteForceMapper(arch,b'',0,0,self.context)
+    mapper = TVAMapper(arch,b'',0,0,self.context) if self.tva else BruteForceMapper(arch,b'',0,0,self.context)
     maxaddr += len(mapper.runtime.get_global_mapping_bytes())
 
     maxaddr += ( 0x1000 - maxaddr%0x1000 ) # Align to page boundary
@@ -207,7 +209,7 @@ class Rewriter(object):
           print( "Base address: %s"%hex(seg.header['p_vaddr']))
           bytes = seg.data()
           base = seg.header['p_vaddr']
-          mapper = BruteForceMapper(arch,bytes,base,entry,self.context)
+          mapper = TVAMapper(arch,bytes,base,entry,self.context) if self.tva else BruteForceMapper(arch,bytes,base,entry,self.context)
           mapping = mapper.gen_mapping()
           newbytes = mapper.gen_newcode(mapping)
           #Perhaps I could find a better location to set the value of global_flag
@@ -325,12 +327,13 @@ if __name__ == '__main__':
 Running this script from the terminal does not allow any instrumentation.
 For that, use this as a library instead.''')
   parser.add_argument('filename',help='The executable file to rewrite.')
+  parser.add_argument('--tva',action='store_true',help='Use TVA to disassemble.')
   parser.add_argument('--so',action='store_true',help='Write a shared object.')
   parser.add_argument('--execonly',action='store_true',help='Write only a main executable without .so support.')
   parser.add_argument('--nopic',action='store_true',help='Write binary without support for arbitrary pic.  It still supports common compiler-generated pic.')
   parser.add_argument('--arch',default='x86',help='The architecture of the binary.  Default is \'x86\'.')
   args = parser.parse_args()
-  rewriter = Rewriter(args.so,args.execonly,args.nopic)
+  rewriter = Rewriter(args.so,args.execonly,args.nopic, tva = args.tva)
   rewriter.rewrite(args.filename,args.arch)
   #cProfile.run('renable(args.filename,args.arch)')
 
