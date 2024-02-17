@@ -1,7 +1,7 @@
 #import sys
 #sys.path.insert(0,'/home/erick/git/delinker/Delinker/src')
 from elfmanip.elfmanip import ELFManip, CustomSection, CustomSegment
-from elfmanip.constants import PT_LOAD, SHF_TLS, PT_TLS
+from elfmanip.constants import PT_LOAD, SHF_TLS, PT_TLS, SHT_NOBITS
 
 from elftools.elf.elffile import ELFFile
 
@@ -47,7 +47,7 @@ def get_tls_content(elf):
     for entry in elf.shdrs['entries']:
         if (entry.sh_flags & SHF_TLS) == SHF_TLS:
             if entry.sh_type == SHT_NOBITS: # bss has no contents
-                content+='\0'*entry.sh_size # fill bss space with 0
+                content+=b'\0'*entry.sh_size # fill bss space with 0
                 print( 'adding .tbss section of length: 0x%x'%entry.sh_size)
             else:
                 content+=entry.contents
