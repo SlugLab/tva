@@ -464,7 +464,7 @@ void process_maps(char *buf, struct gm_entry *global_mapping){
 				gm_index++;
 				parse_range(line, &old_text_start, &old_text_end);
 				// prefill slot so we crash on incorrect processing
-				populate_mapping(gm_index, old_text_start, old_text_end, 0x00000001, global_mapping);
+				populate_mapping(gm_index, old_text_start, old_text_end, 0x00000000, global_mapping);
 #ifdef DEBUG
 				printf("Parsed range for r-xp: %lx-%lx\n", old_text_start, old_text_end);
 #endif
@@ -476,10 +476,6 @@ void process_maps(char *buf, struct gm_entry *global_mapping){
 					// It will then rewrite the return address on the stack and return the original address.
 					populate_mapping(gm_index, old_text_start, old_text_end, 0x00000000, global_mapping);
 				}
-				else{
-					// internal things become read only
-					mprotect((void*)old_text_start, old_text_end-old_text_start, PROT_READ);
-				}
 			}else{
 				parse_range(line, &new_text_start, &new_text_end);
 #ifdef DEBUG
@@ -487,6 +483,8 @@ void process_maps(char *buf, struct gm_entry *global_mapping){
 #endif
 				// mapping covers until the end of the new code region so that mapped addresses are handled
 				populate_mapping(gm_index, old_text_start, new_text_end, new_text_start, global_mapping);
+				// internal things become read only when we have mappings
+				mprotect((void*)old_text_start, old_text_end-old_text_start, PROT_READ);
 			}
 		}
 		line = next_line(line);
