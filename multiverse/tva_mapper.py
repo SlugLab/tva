@@ -55,6 +55,7 @@ class TVAMapper(Mapper):
           currmap[ins.address] = len(newins)
         else:
           currmap[ins.address] = len(ins.bytes)
+    maplist.append(currmap)
     self.context.lookup_function_offset = 0 #Place lookup function at start of new text section
     lookup_size = len(self.runtime.get_lookup_code(self.base,len(self.bytes),0,0x8f)) #TODO: Issue with mapping offset & size
     offset = lookup_size
@@ -121,6 +122,7 @@ class TVAMapper(Mapper):
         else:
           bytemap[ins.address] = ins.bytes #This instruction is unchanged, and its old address maps to it
     #Add the lookup function as the first thing in the new text section
+    maplist.append(bytemap)
     newbytes+=self.runtime.get_lookup_code(self.base,len(self.bytes),self.context.lookup_function_offset,mapping[self.context.mapping_offset])
     if self.context.exec_only:
       newbytes += self.runtime.get_secondary_lookup_code(self.base,len(self.bytes),self.context.secondary_lookup_function_offset,mapping[self.context.mapping_offset])
