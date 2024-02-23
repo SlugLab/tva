@@ -15,6 +15,8 @@ class TVAMapper(Mapper):
     self.base = base
     self.entry = entry
     self.context = context
+    self.mapping = {}
+    self.jumptrgt = {}
     if arch == 'x86':
       #NOTE: We are currently NOT supporting instrumentation because we are passing
       #None to the translator.  TODO: Add back instrumentation after everything gets
@@ -40,6 +42,8 @@ class TVAMapper(Mapper):
     mapping = {}
     maplist = []
     currmap = {}
+    jumptrgts = {}
+    prev_is_jump = False
     last = None #Last instruction disassembled
     reroute = assembler.asm('jmp $+0x8f') #Dummy jmp to imitate connecting jmp; we may not know dest yet
     for ins in self.disassembler.disasm(self.bytes,self.base):
@@ -51,6 +55,11 @@ class TVAMapper(Mapper):
       elif ins is not None:
         last = ins #Remember the last disassembled instruction
         newins = self.translator.translate_one(ins,None) #In this pass, the mapping is incomplete
+        if prev_is_jump or ins.mnemonic in ['endbr64']:
+            jumptrgts[ins.address] = True
+        prev_is_jump = False
+        if ins.mnemonic in ['call']: #, 'jmp', 'bnd jmp']:
+            prev_is_jump = True
         if newins is not None:
           currmap[ins.address] = len(newins)
         else:
@@ -94,6 +103,8 @@ class TVAMapper(Mapper):
       self.context.popgm_offset = len(self.runtime.get_global_lookup_code())
       self.context.global_sysinfo = self.context.global_lookup + self.context.popgm_offset + len(self.runtime.get_popgm_code())
       #Now that this is set, the auxvec code should work
+    self.mapping = mapping # cache mapping
+    self.jumptrgts = jumptrgts # and jump targets for future
     return mapping
 
   def gen_newcode(self,mapping):
@@ -138,9 +149,11 @@ class TVAMapper(Mapper):
     return newbytes
 
   def write_mapping(self,mapping,base,size):
+    if mapping != self.mapping:
+        print("mapping was changed from when it was generated!!!")
     bytes = b''
     for addr in range(base,base+size):
-      if addr in mapping:
+      if addr in self.jumptrgts and self.jumptrgts[addr]:
         if addr < 10:
           print( 'offset for 0x%x: 0x%x' % (addr, mapping[addr]))
         bytes+=struct.pack('<I',mapping[addr]) #Write our offset in little endian
