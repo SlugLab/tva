@@ -82,12 +82,13 @@ callbacks = {'__libc_start_main':[0,3,4]}'''
 
 class Rewriter(object):
 
-  def __init__(self,write_so,exec_only,no_pic, tva=False):
+  def __init__(self,write_so,exec_only,no_pic, tva=False, ss = False):
     self.context = Context()
     self.context.write_so = write_so
     self.context.exec_only = exec_only
     self.context.no_pic = no_pic
     self.tva = tva
+    self.context.use_shadow_stack = ss
 
   def set_before_inst_callback(self,func):
     '''Pass a function that will be called when translating each instruction.
@@ -334,7 +335,7 @@ For that, use this as a library instead.''')
   parser.add_argument('--nopic',action='store_true',help='Write binary without support for arbitrary pic.  It still supports common compiler-generated pic.')
   parser.add_argument('--arch',default='x86',help='The architecture of the binary.  Default is \'x86\'.')
   args = parser.parse_args()
-  rewriter = Rewriter(args.so,args.execonly,args.nopic, tva = args.tva)
+  rewriter = Rewriter(args.so,args.execonly,args.nopic, tva = args.tva, ss = args.ss)
   rewriter.rewrite(args.filename,args.arch)
   #cProfile.run('renable(args.filename,args.arch)')
 
