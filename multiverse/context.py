@@ -21,6 +21,8 @@ class Context(object):
     self.get_pc_thunk = 0 #Set to zero by default so that if it isn't in the binary, no instruction will match
     self.num_new_segments = 4 # 4 new segments in the main binary
     self.move_phdrs_to_text = False # Do not relocate phdrs to text section by default
+    self.use_shadow_stack = False
+    self.shadow_stack_offset = -0x8008000
     self.stat = {}
     self.stat['indcall'] = 0
     self.stat['indjmp'] = 0

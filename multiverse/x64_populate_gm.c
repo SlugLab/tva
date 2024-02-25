@@ -65,6 +65,17 @@ int wrapper(void* glookup){
 #else
 int _start(void * glookup){
 #endif
+#ifdef SHADOW_STACK
+	//make shadow stack
+	mmap(
+			__builtin_frame_address(0) -0x8008000 - 0x780000,
+			0x8008000,
+			PROT_READ | PROT_WRITE,
+			MAP_PRIVATE | MAP_ANONYMOUS,
+			-1,
+			0);
+#endif
+	//make global mapping
 	struct gm_entry* global_mapping = mmap(
 			GM_LOC,
 			4 * PAGE_SIZE,
@@ -91,6 +102,9 @@ void segv_handle(int signal){
                 "mov rax, [rsp+ 0xb0]\n" // load current return addr
                 "mov rbx, 0\n" // figure out how to tell it not to recurse
 		"call [0x56780008]\n" // mapper addr
+		"mov [rsp-8], rax\n" //store mapper
+                "mov rax, [rsp+ 0xb0]\n" // load current return addr
+		"call [rsp-8]\n" //run mapper
 		// TODO: check for successful mapping
 		"mov [rsp+ 0xb0], rax\n" // load mapped addr
 		"ret\n"

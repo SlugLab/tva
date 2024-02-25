@@ -37,26 +37,20 @@ class X64Runtime(object):
     #TODO: support lookup for binary/library combination
     lookup_template = '''
     lookup:
-  	push rbx
-  	mov rbx,rax
-       lea rax, [rip - %s + lookup]
-       %s
-  	jb outside
-  	cmp rbx,%s
-  	jae outside
-  	mov ebx,[rax+rbx*4+%s]
-  	cmp ebx, 0xffffffff
-  	je failure
-  	add rax,rbx
-  	pop rbx
-  	ret
-    outside:
-  	%s
-  	mov rax,rbx
-    mov rbx, [0x56780008]
-    xchg rbx, [rsp]
-    add rsp, 8
-    jmp [rsp-8]
+      push rbx
+      mov rbx,rax
+      lea rax, [rip - %s + lookup]
+      add rbx, %s
+      sub rbx, rax
+      jb failure
+      cmp rbx,%s
+      jae failure
+      mov ebx,[rax+rbx*4+%s]
+      cmp ebx, 0xffffffff
+      je failure
+      add rax,rbx
+      pop rbx
+      ret
     failure:
   	hlt
     '''
@@ -115,10 +109,9 @@ class X64Runtime(object):
     else:
       return _asm(lookup_template%(
           lookup_off,
-          so_code%(self.context.newbase - base),
+          self.context.newbase - base,
           size,
-          mapping_off,
-          so_restore%(self.context.newbase - base)
+          mapping_off
         ))
 
   def get_secondary_lookup_code(self,base,size,sec_lookup_off,mapping_off):
@@ -236,29 +229,13 @@ class X64Runtime(object):
 	inc rdx			
 	jmp searchloop		
     success:
-	mov rcx,[rcx]
-	test rcx,rcx
-	jz external
+	mov rax,[rcx]
+	test rax,rax
 	pop r10			
 	pop rdx
 	pop rbx
-	call rcx		 
 	pop rcx
 	ret
-    external:
-	pop r10			
-	pop rdx
-	pop rbx
-	pop rcx	
-	test rbx, rbx
-	jz skip
-    	mov [rsp-64],rax		
-    	mov rax,[rsp+8]	
-    	call glookup		
-    	mov [rsp+8],rax	
-    	mov rax,[rsp-64]		
-	skip:
-  	ret
     failure:
 	hlt
     '''

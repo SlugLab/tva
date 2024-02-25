@@ -328,6 +328,7 @@ Running this script from the terminal does not allow any instrumentation.
 For that, use this as a library instead.''')
   parser.add_argument('filename',help='The executable file to rewrite.')
   parser.add_argument('--tva',action='store_true',help='Use TVA to disassemble.')
+  parser.add_argument('--ss',action='store_true',help='Use shadow stack.')
   parser.add_argument('--so',action='store_true',help='Write a shared object.')
   parser.add_argument('--execonly',action='store_true',help='Write only a main executable without .so support.')
   parser.add_argument('--nopic',action='store_true',help='Write binary without support for arbitrary pic.  It still supports common compiler-generated pic.')

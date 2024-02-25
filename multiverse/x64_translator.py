@@ -161,19 +161,51 @@ class X64Translator(Translator):
     mov eax, [esp-32]	;restore old eax value (the pop has shifted our stack so we must look at 28+4=32)
     jmp [esp-4]		;jmp/call to new address
     '''
-    template_before = '''
-    mov [rsp-56], rax
-    pop rax
-    push rbx
-    mov rbx, 0
-    '''
-    template_after = '''
-    call $+%s
-    pop rbx
+    # save old rax value
+    # get ret_addr and push GL
+    # call GL and determine if external
+    # map return address
+    # pop through placeholder value
+    # and get actual rax
+    # then go one further + pop arg
+    # past return addr and jmp to leave
+    template = '''
+    push rax
+    mov rax, [rsp+8]
+    push [0x56780008]
+    call [rsp]
+    test rax, rax
+    je extern
     %s
-    mov [rsp-8], rax
-    mov rax, [rsp-%d]
+    extern:
+    pop rax
+    pop rax
+    add rsp, 8 + %d
     jmp [rsp-8]
+    '''
+
+    # stack top is scratch and rax is func ptr
+    # get the addr to map
+    # map it
+    # and put it back
+    call_mapper = '''
+    mov [rsp], rax
+    mov rax, [rsp+16]
+    call [rsp]
+    mov [rsp+16 - %d], rax
+    '''
+  # assumes rax is stored at stack
+  # and therefor rsp+8 is the actual return addr
+    shadow_ret = '''
+        add rsp, 24
+        mov rax, [rsp + {}]
+        test rax, [rsp]
+        jne panic
+        push [rax, rsp + {}]
+        sub rsp, 16
+        jmp extern
+        panic:
+        jmp 0
     '''
     self.context.stat['ret']+=1
     code = b''
@@ -189,21 +221,17 @@ class X64Translator(Translator):
     if self.context.no_pic: # and ins.address != self.context.get_pc_thunk + 3:
       #Perform a normal return UNLESS this is the ret for the thunk.
       #Currently its position is hardcoded as three bytes after the thunk entry.
-      code = asm( 'ret %s'%ins.op_str )
+      code += asm( 'ret %s'%ins.op_str )
     else:
-      code = asm(template_before)
-      size = len(code)
-      lookup_target = b''
-      if self.context.exec_only:
-        #Special lookup for not rewriting arguments when going outside new main text address space
-        lookup_target = self.remap_target(ins.address,mapping,self.context.secondary_lookup_function_offset,size)
-      else:
-        lookup_target = self.remap_target(ins.address,mapping,self.context.lookup_function_offset,size)
-      if ins.op_str == '':
-        code+=asm(template_after%(lookup_target,'',64)) #64 because of the value we popped
-      else: #For ret instructions that pop imm16 bytes from the stack, add that many bytes to esp
-        pop_amt = int(ins.op_str,16) #We need to retrieve the right eax value from where we saved it
-        code+=asm(template_after%(lookup_target,'add rsp,%d'%pop_amt,64+pop_amt))
+      #For ret instructions that pop imm16 bytes from the stack, add that many bytes to esp
+      pop_amt = 0
+      if ins.op_str != '':
+        pop_amt = int(ins.op_str,16)
+      code += _asm(template%(
+          shadw_ret.format(self.context.shadow_stack_offset,
+              self.context.shadow_stack_offset - (0x100000))
+          if self.context.use_shadow_stack else call_mapper%(pop_amt),
+          pop_amt))
     return code
 
   def translate_cond(self,ins,mapping):
@@ -281,7 +309,21 @@ class X64Translator(Translator):
         '''
         orig_addr = (ins.address + len(ins.bytes))
         start_of_block = (len(code) + self.context.newbase + (mapping[ins.address] if mapping is not None else 0))
-        code += _asm(any_call%(orig_addr - start_of_block))
+        append_code = ''
+        if self.context.use_shadow_stack:
+          mapped_return_offset = (len(code) + self.context.newbase + (mapping[ins.address + len(ins.bytes)] if mapping is not None else 0)) - start_of_block
+          append_code = '''
+            push rbx
+            lea rbx, [rip + base + %s]
+            xchg rbx, [rsp]
+                pop [rsp + {}]
+                pop [rsp + {}]
+                sub rsp, 8
+              '''%(
+                  mapped_return_offset,
+                  self.context.shadow_stack_offset- 0x100000,
+                  self.context.shadow_stack_offset)
+        code += _asm('{}\n{}'.format(any_call%(orig_addr - start_of_block),append_code))
       else:
         self.context.stat['dirjmp']+=1
       newtarget = self.remap_target(ins.address,mapping,target,len(code))
@@ -316,23 +358,49 @@ class X64Translator(Translator):
     #original address that rip WOULD have pointed to, so we must replace any references to it.
     template_before = '''
     base:
-    mov [rsp-64], rax
-    mov [rsp-72], rbx
+    %s
+    push rax
+    push rbx
     mov rax, %s
     mov rbx, %s
-    %s
     '''
     rip_rel_call = '''
     push rbx
     lea rbx,[rip + base - %s]
     xchg rbx,[rsp]
     '''
+    shadow_stack_call = '''
+    push rbx
+    lea rbx,[rip + %s]
+    xchg rbx,[rsp]
+    pop [rsp + %d]
+    push rbx
+    lea rbx,[rip + base - %d]
+    xchg rbx,[rsp]
+    pop [rsp + %d]
+    sub rsp, 8
+    '''
+    # have +8 from ret addr at start of this
     template_after = '''
-    call $+%s
-    mov [rsp-8], rax
-    mov rax, [rsp-%s]
-    mov rbx, [rsp-%s]
+    push rax
+    push [0x56780008]
+    call [rsp]
+    test rax, rax
+    jz extern
+    xchg rax, [rsp+8]
+    call [rsp+8]
+    mov rbx, [rsp + 16]
+    xchg rax, [rsp+24]
+    add rsp, 32
     jmp [rsp-8]
+    extern:
+    pop rax
+    pop rax
+    pop rbx
+    xchg rax, [rsp]
+    add rsp, 8
+    jmp [rsp-8]
+    end:
     '''
     template_nopic = '''
     call $+%s
@@ -358,23 +426,41 @@ class X64Translator(Translator):
         oldone = len( asm( '%s %s' % (ins.mnemonic, self.replace_rip(ins,None) ) ) )
         print( '%d vs %d, %s' % (newone,oldone,newone == oldone))'''
       # The new "instruction length" is the length of all preceding code, plus the instructions up through the one referencing rip
-      target = self.replace_rip(ins,mapping,len(code) + len(asm('mov [rsp-64],rax\nmov [rsp-72], rbx\nmov rax,[rip]')) )
+      target = self.replace_rip(ins,
+              mapping,
+              len(code) +
+              len(_asm(
+                  ((
+          shadow_stack_call%("0", self.context.shadow_stack_offset-0x100000,
+              ins_addr_off_from_block, self.context.shadow_stack_offset)
+                      if self.context.use_shadow_stack else
+                      ('base:\n' + rip_rel_call%(0)+ '\n'))
+                  if ins.mnemonic == 'call' else '') +
+                  'push rax\npush rbx\nmov rax,[rip]'))
+              )
     if self.context.no_pic:
       if ins.mnemonic == 'call':
         self.context.stat['indcall']+=1
       else:
         self.context.stat['indjmp']+=1
-      code += asm( template_before%(target, 1 if ins.mnemonic == call else 0,'') )
+      code += _asm("{}\n{}".format( template_before%('', target,1), (template_after)))
     elif ins.mnemonic == 'call':
       self.context.stat['indcall']+=1
       mapped_addr = 0x8f if mapping is None else mapping[ins.address] + len(code)
       start_of_block = mapped_addr + self.context.newbase
       ins_offset = (ins.address+len(ins.bytes))
       ins_addr_off_from_block = start_of_block - ins_offset
-      code += _asm( template_before%(target,1,rip_rel_call%(hex(ins_addr_off_from_block))) )
+      code += _asm("{}\n{}".format( template_before%(
+          shadow_stack_call%("end", self.context.shadow_stack_offset-0x100000,
+              ins_addr_off_from_block, self.context.shadow_stack_offset)
+          if self.context.use_shadow_stack else
+          rip_rel_call%(ins_addr_off_from_block),
+          target,1),
+          (template_after)
+          ))
     else:
       self.context.stat['indjmp']+=1
-      code += asm(template_before%(target, 0,''))
+      code += _asm("{}\n{}".format( template_before%('', target,0), (template_after)))
     size = len(code)
     lookup_target = self.remap_target(ins.address,mapping,self.context.lookup_function_offset,size)
     #Always transform an unconditional control transfer to a jmp, but
@@ -388,10 +474,6 @@ class X64Translator(Translator):
       #Change target to secondary lookup function instead
       lookup_target = self.remap_target(ins.address,mapping,self.context.secondary_lookup_function_offset,size)
       code += asm( template_nopic%(lookup_target,64,ins.mnemonic) )
-    elif ins.mnemonic == 'call':
-      code += asm(template_after%(lookup_target,56, 56+8))
-    else:  
-      code += asm(template_after%(lookup_target,64, 64+8))
     return code
   
   def get_remap_callbacks_code(self,ins,mapping,target):

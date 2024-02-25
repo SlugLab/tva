@@ -6,6 +6,10 @@ textsection=$(readelf -S -W x86_populate_gm | grep '.text')
 if [[ ${textsection} =~ ${re} ]]; then 
 	dd if=x86_populate_gm of=x86_popgm skip=$((0x${BASH_REMATCH[1]})) bs=1 count=$((0x${BASH_REMATCH[2]})) 
 fi 
+textsection=$(readelf -S -W x64_populate_gm_shadow | grep '.text')
+if [[ ${textsection} =~ ${re} ]]; then
+	dd if=x64_populate_gm_shadow of=x64_popgm_shadow skip=$((0x${BASH_REMATCH[1]})) bs=1 count=$((0x${BASH_REMATCH[2]}))
+fi
 textsection=$(readelf -S -W x64_populate_gm | grep '.text')
 if [[ ${textsection} =~ ${re} ]]; then
 	dd if=x64_populate_gm of=x64_popgm skip=$((0x${BASH_REMATCH[1]})) bs=1 count=$((0x${BASH_REMATCH[2]})) 
